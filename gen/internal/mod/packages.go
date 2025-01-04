@@ -26,8 +26,17 @@ func (f *Func) String() string {
 	return f.FuzzName()
 }
 
-func (i Func) GetFullName() string {
-	return i.PkgPath + i.FuncName
+func (f *Func) GetSignature() *types.Signature {
+	return f.TypesFunc.Type().(*types.Signature)
+}
+
+func (s *Func) TypeString(qualifier types.Qualifier) string {
+	prefix := qualifier(s.TypesFunc.Pkg())
+	if prefix == "" {
+		return s.FuncName
+	}
+
+	return fmt.Sprintf("%s.%s", prefix, s.FuncName)
 }
 
 type Struct struct {
@@ -41,48 +50,72 @@ type Struct struct {
 	AsPointer bool // detect that struct implement interface as pointer to this struct
 }
 
+func (s Struct) String() string {
+	return s.TypesNamed.String()
+}
+
+func (s Struct) TypeString(qualifier types.Qualifier) string {
+	return types.TypeString(s.TypesNamed, qualifier)
+}
+
 type Interface struct {
 	InterfaceName   string
 	PkgName         string           // package name (should be the same as the package's package statement)
 	PkgPath         string           // import path
 	PkgDir          string           // local on-disk directory
-	TypesInterface  *types.Interface // auxiliary information about a Struct from the go/types package
-	Implementations []Struct         // structs that implements this interface from explore packages
+	TypesInterface  *types.Interface // auxiliary information about a Interface from the go/types package
+	TypesNamed      *types.Named     // auxiliary information about a Named from the go/types package
+	Implementations []*Struct        // structs that implements this interface from explore packages
 }
 
-func (i Interface) GetFullName() string {
-	return i.PkgPath + i.InterfaceName
+func (i Interface) String() string {
+	return i.TypesNamed.String()
 }
 
-// TODO: probably rename internal/mod to internal/pkg.
 type Package struct {
 	PkgName      string
 	PkgPath      string
-	Targets      []Func // funcs for fuzzing
-	Constructors []Func
-	Funcs        []Func
-	Structs      []Struct
-	Interfaces   []Interface
+	Targets      []*Func // funcs for fuzzing
+	Constructors []*Func
+	Funcs        []*Func
+	Structs      []*Struct
+	Interfaces   []*Interface
 }
 
-func (pkg Package) GetSupportedInterfaces() map[string]Interface {
-	supportedInterfaces := make(map[string]Interface)
+type PackagePattern struct {
+	Funcs      []*Func
+	Structs    []*Struct
+	Interfaces []*Interface
+}
+
+func Merge(pkgs []*Package) *PackagePattern {
+	pattern := PackagePattern{}
+
+	for _, pkg := range pkgs {
+		pattern.Funcs = append(pattern.Funcs, pkg.Funcs...)
+		pattern.Structs = append(pattern.Structs, pkg.Structs...)
+		pattern.Interfaces = append(pattern.Interfaces, pkg.Interfaces...)
+	}
+
+	return &pattern
+}
+
+func (pkg PackagePattern) GetSupportedInterfaces() map[string]*Interface {
+	supportedInterfaces := make(map[string]*Interface)
 	for _, pkgInterface := range pkg.Interfaces {
 		if len(pkgInterface.Implementations) > 0 {
-			supportedInterfaces[pkgInterface.GetFullName()] = pkgInterface
+			supportedInterfaces[pkgInterface.String()] = pkgInterface
 		}
 	}
 
 	return supportedInterfaces
 }
 
-func (pkg Package) GetExistedFunctions() map[string]Func {
-	existsFunctions := make(map[string]Func)
-	for _, pkgFunc := range pkg.Funcs {
-		sig := pkgFunc.TypesFunc.Type().Underlying().(*types.Signature)
-
-		existsFunctions[sig.String()] = pkgFunc
+func (pkg PackagePattern) GetSupportedStructs() map[string]*Struct {
+	supportedStructs := make(map[string]*Struct)
+	for _, pkgStruct := range pkg.Structs {
+		supportedStructs[pkgStruct.String()] = pkgStruct
 	}
 
-	return existsFunctions
+	return supportedStructs
 }

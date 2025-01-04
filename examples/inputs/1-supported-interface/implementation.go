@@ -11,7 +11,17 @@ func (printer MyPrinter) Print(s string) int {
 	return len(s)
 }
 
+type B struct {
+	I, J int
+	S    string
+}
+
 type MyPointerPrinter struct {
+	B        B
+	I        int
+	Printer  Printer
+	Printer_ Printer
+	Printer2 MyPrinter
 }
 
 func (printer *MyPointerPrinter) Print(s string) int {
@@ -19,12 +29,12 @@ func (printer *MyPointerPrinter) Print(s string) int {
 }
 
 type IInterface interface {
-	Do(x int) bool
+	Do(printer Printer) bool
 }
 
 type A struct {
 }
 
-func (a A) Do(x int) bool {
-	return x%2 == 0
+func (a A) Do(printer Printer) bool {
+	return true
 }

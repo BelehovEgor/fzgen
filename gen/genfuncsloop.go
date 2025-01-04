@@ -42,7 +42,7 @@ func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName str
 			c = &chain{recvType: recvType}
 			recvTypes[recvType] = c
 		}
-		c.steps = append(c.steps, function)
+		c.steps = append(c.steps, *function)
 	}
 
 	if len(recvTypes) == 0 {
@@ -65,7 +65,7 @@ func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName str
 			// No methods found in loop above for this named type, so nothing to do with this possible constructor.
 			continue
 		}
-		c.constructors = append(c.constructors, constructor)
+		c.constructors = append(c.constructors, *constructor)
 	}
 
 	// Put our chains in a deterministic order.
@@ -322,7 +322,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 
 	// Check if we have an interface or function pointer in our desired parameters,
 	// which we can't fill with values during fuzzing.
-	support, unsupportedParam := checkParamSupport(inputParams, nil, nil)
+	support, unsupportedParam := checkParamSupport(inputParams, make(map[string]*mod.Interface), make([]*mod.Func, 0))
 	if support == noSupport {
 		// we can't emit this chain target.
 		emit("// skipping %s because parameters include func, chan, or unsupported interface: %v\n\n", wrapperName, unsupportedParam)
@@ -467,7 +467,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 
 	// Check if we have an interface or function pointer in our desired parameters,
 	// which we can't fill with values during fuzzing.
-	support, unsupportedParam := checkParamSupport(inputParams, nil, nil)
+	support, unsupportedParam := checkParamSupport(inputParams, make(map[string]*mod.Interface), make([]*mod.Func, 0))
 	if support == noSupport {
 		// skip this wrapper.
 		emit("// skipping %s because parameters include func, chan, or unsupported interface: %v\n\n", wrapperName, unsupportedParam)

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
@@ -110,6 +111,8 @@ func FzgenMain() int {
 		return 1
 	}
 
+	pkgsPatternContent := mod.Merge(pkgs)
+
 	// Check if we are looking at one package vs. multiple.
 	if len(pkgs) > 1 && hasPath(*outFileFlag) {
 		fmt.Fprint(os.Stderr, "fzgen:-o can only specify a file name and not a path when the package pattern matches multiple packages\n")
@@ -184,7 +187,7 @@ func FzgenMain() int {
 		// Do the actual work of emitting our wrappers.
 		var out []byte
 		if !*chainFlag {
-			out, err = emitIndependentWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
+			out, err = emitIndependentWrappers(pkgs[i].PkgPath, pkgs[i], pkgsPatternContent, wrapperPkgName, wrapperOpts)
 		} else {
 			out, err = emitChainWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
 		}

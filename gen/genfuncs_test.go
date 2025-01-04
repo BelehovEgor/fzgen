@@ -8,11 +8,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
 // to update golden files in ./testdata:
-//   go test -update
+//
+//	go test -update
 var updateFlag = flag.Bool("update", false, "update golden files")
 
 // The first subtest here is the simplest & fatest test in the file. To run just that:
@@ -48,12 +50,14 @@ func TestTypes(t *testing.T) {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
+			allContent := mod.Merge(pkgs)
+
 			wrapperOpts := wrapperOptions{
 				qualifyAll:         tt.qualifyAll,
 				insertConstructors: true,
 			}
 
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], "examplefuzz", wrapperOpts)
+			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
@@ -143,11 +147,13 @@ func TestConstructorInjection(t *testing.T) {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
+			allContent := mod.Merge(pkgs)
+
 			wrapperOpts := wrapperOptions{
 				qualifyAll:         tt.qualifyAll,
 				insertConstructors: tt.injectConstructors,
 			}
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], "examplefuzz", wrapperOpts)
+			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
@@ -229,12 +235,14 @@ func TestExported(t *testing.T) {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
+			allContent := mod.Merge(pkgs)
+
 			wrapperOpts := wrapperOptions{
 				qualifyAll:         tt.qualifyAll,
 				insertConstructors: true,
 			}
 
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], "examplefuzz", wrapperOpts)
+			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}

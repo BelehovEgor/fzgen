@@ -102,11 +102,7 @@ func findFuncs(
 }
 
 func getPackagesContent(
-	pkgs []*packages.Package,
-	env []string,
-	funcPattern, conPattern *regexp.Regexp,
-	flags findFuncFlag,
-) ([]*mod.Package, error) {
+	pkgs []*packages.Package, env []string, funcPattern, conPattern *regexp.Regexp, flags findFuncFlag) ([]*mod.Package, error) {
 	pkgsContent := make([]*mod.Package, 0)
 
 	for _, pkg := range pkgs {
@@ -137,11 +133,11 @@ func getPackageContent(
 	pkgDir := ""
 	var err error
 
-	targets := make([]mod.Func, 0)
-	constructors := make([]mod.Func, 0)
-	funcs := make([]mod.Func, 0)
-	structs := make([]mod.Struct, 0)
-	interfaces := make([]mod.Interface, 0)
+	targets := make([]*mod.Func, 0)
+	constructors := make([]*mod.Func, 0)
+	funcs := make([]*mod.Func, 0)
+	structs := make([]*mod.Struct, 0)
+	interfaces := make([]*mod.Interface, 0)
 
 	for id, obj := range pkg.TypesInfo.Defs {
 		if pkgDir == "" {
@@ -159,15 +155,16 @@ func getPackageContent(
 
 			objNamed := obj.Type().(*types.Named)
 			if types.IsInterface(objNamed) {
-				interfaces = append(interfaces, mod.Interface{
+				interfaces = append(interfaces, &mod.Interface{
 					InterfaceName:  id.Name,
 					PkgName:        pkg.Name,
 					PkgPath:        pkg.PkgPath,
 					PkgDir:         pkgDir,
 					TypesInterface: objType.Type().Underlying().(*types.Interface),
+					TypesNamed:     objNamed,
 				})
 			} else if structType, ok := objType.Type().Underlying().(*types.Struct); ok {
-				structs = append(structs, mod.Struct{
+				structs = append(structs, &mod.Struct{
 					StructName:  id.Name,
 					PkgName:     pkg.Name,
 					PkgPath:     pkg.PkgPath,
@@ -185,9 +182,9 @@ func getPackageContent(
 				TypesFunc: objType,
 			}
 
-			funcs = append(funcs, f)
-			addTarget(&targets, f, funcPattern, flags)
-			addConstructor(&constructors, f, conPattern)
+			funcs = append(funcs, &f)
+			addTarget(&targets, &f, funcPattern, flags)
+			addConstructor(&constructors, &f, conPattern)
 		}
 	}
 
@@ -202,7 +199,7 @@ func getPackageContent(
 	}, nil
 }
 
-func addTarget(targets *[]mod.Func, f mod.Func, funcPattern *regexp.Regexp, flags findFuncFlag) error {
+func addTarget(targets *[]*mod.Func, f *mod.Func, funcPattern *regexp.Regexp, flags findFuncFlag) error {
 	if isInterfaceRecv(f.TypesFunc) {
 		// TODO: control via flag?
 		// TODO: merge back to fzgo/fuzz.FindFunc?
@@ -236,19 +233,19 @@ func addTarget(targets *[]mod.Func, f mod.Func, funcPattern *regexp.Regexp, flag
 	return nil
 }
 
-func addConstructor(constructors *[]mod.Func, f mod.Func, constructorRe *regexp.Regexp) {
+func addConstructor(constructors *[]*mod.Func, f *mod.Func, constructorRe *regexp.Regexp) {
 	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) {
 		*constructors = append(*constructors, f)
 	}
 }
 
-func setStructImplementedInterfaces(structs []mod.Struct, interfaces []mod.Interface) {
+func setStructImplementedInterfaces(structs []*mod.Struct, interfaces []*mod.Interface) {
 	for _, _struct := range structs {
 		for _, _interface := range interfaces {
 			if types.AssignableTo(_struct.TypesNamed, _interface.TypesInterface) {
 				_interface.Implementations = append(_interface.Implementations, _struct)
 			} else if types.AssignableTo(types.NewPointer(_struct.TypesNamed), _interface.TypesInterface) {
-				_interface.Implementations = append(_interface.Implementations, mod.Struct{
+				_interface.Implementations = append(_interface.Implementations, &mod.Struct{
 					StructName:  _struct.StructName,
 					PkgName:     _struct.PkgName,
 					PkgPath:     _struct.PkgPath,

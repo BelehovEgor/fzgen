@@ -234,4 +234,10 @@ func Fuzz_TypesShortListNoFill(f *testing.F) {
 
 // skipping Fuzz_TypesShortListSkip1 because parameters include func, chan, or unsupported interface: chan bool
 
-// skipping Fuzz_TypesShortListSkip2 because parameters include func, chan, or unsupported interface: func(int)
+func Fuzz_TypesShortListSkip2(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var x func(int) = fuzzwrapexamples.Short1
+
+		fuzzwrapexamples.TypesShortListSkip2(x)
+	})
+}

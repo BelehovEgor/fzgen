@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
@@ -62,11 +63,13 @@ func TestStrings(t *testing.T) {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
+			allContent := mod.Merge(pkgs)
+
 			wrapperOpts := wrapperOptions{
 				qualifyAll:         tt.qualifyAll,
 				insertConstructors: tt.insertConstructors,
 			}
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], "examplefuzz", wrapperOpts)
+			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}

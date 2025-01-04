@@ -34,7 +34,13 @@ var (
 // emitIndependentWrappers emits fuzzing wrappers where possible for the list of functions passed in.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
-func emitIndependentWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
+func emitIndependentWrappers(
+	pkgPath string,
+	pkgFuncs *mod.Package,
+	pkgsPatternContent *mod.PackagePattern,
+	wrapperPkgName string,
+	options wrapperOptions,
+) ([]byte, error) {
 	if len(pkgFuncs.Targets) == 0 {
 		return nil, fmt.Errorf("%w: 0 matching functions", errNoFunctionsMatch)
 	}
@@ -66,8 +72,9 @@ func emitIndependentWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgNa
 		return pkgFuncs.Targets[i].TypesFunc.String() < pkgFuncs.Targets[j].TypesFunc.String()
 	})
 
-	supportedInterfaces := pkgFuncs.GetSupportedInterfaces()
-	existsFunctions := pkgFuncs.GetExistedFunctions()
+	supportedInterfaces := pkgsPatternContent.GetSupportedInterfaces()
+	supportedStructs := pkgsPatternContent.GetSupportedStructs()
+	existedFuncs := pkgsPatternContent.Funcs
 
 	// Loop over our the functions we are wrapping, emitting a wrapper where possible.
 	// We only return an error if all fail.
@@ -79,15 +86,16 @@ func emitIndependentWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgNa
 			for _, constructor := range pkgFuncs.Constructors {
 				// Skip over any candidate constructors with unsupported params.
 				ctorInputParams := params(constructor.TypesFunc)
-				support, _ := checkParamSupport(ctorInputParams, supportedInterfaces, existsFunctions)
+				support, _ := checkParamSupport(ctorInputParams, supportedInterfaces, existedFuncs)
 				if support == noSupport {
 					continue
 				}
-				constructors = append(constructors, constructor)
+				constructors = append(constructors, *constructor)
 			}
 		}
 
-		err := emitIndependentWrapper(emit, function, constructors, supportedInterfaces, existsFunctions, options.qualifyAll)
+		err := emitIndependentWrapper(
+			emit, *function, constructors, supportedInterfaces, supportedStructs, existedFuncs, options.qualifyAll)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -119,8 +127,9 @@ func emitIndependentWrapper(
 	emit emitFunc,
 	function mod.Func,
 	constructors []mod.Func,
-	supportedInterfaces map[string]mod.Interface,
-	existedFuncs map[string]mod.Func,
+	supportedInterfaces map[string]*mod.Interface,
+	supportedStructs map[string]*mod.Struct,
+	existedFuncs []*mod.Func,
 	qualifyAll bool) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
@@ -245,22 +254,41 @@ func emitIndependentWrapper(
 		// First, finish the line we are on.
 		emit("data []byte) {\n")
 		// Second, declare the variables we need to fill.
+		fillParams := make([]paramRepr, 0)
 		for _, p := range paramReprs {
-			emit("\t\tvar %s %s\n", p.paramName, p.typ)
-		}
-		// Third, create a fzgen.Fuzzer
-		emit("\t\tfz := fuzzer.NewFuzzer(data)\n")
-		// Fourth, emit a potentially wide Fill call for all the variables we declared.
-		emit("\t\tfz.Fill(")
-		for i, p := range paramReprs {
-			if i > 0 {
-				emit(", ")
+			if pkgInterface, ok := supportedInterfaces[p.v.Type().String()]; ok {
+				initLines := pkgInterface.GetConstructors(p.paramName, defaultQualifier, supportedInterfaces, existedFuncs)
+				emit(initLines[0])
+				fillParams = append(fillParams, p)
+			} else if pkgStruct, ok := supportedStructs[p.v.Type().String()]; ok && mod.HasNotNative(pkgStruct) {
+				initLines := pkgStruct.Initialize(p.paramName, defaultQualifier, supportedInterfaces, existedFuncs)
+				emit(initLines)
+				fillParams = append(fillParams, p)
+			} else if signature, ok := p.v.Type().Underlying().(*types.Signature); ok {
+				suitables := mod.FindSuitables(signature, existedFuncs)
+				emit("\t\tvar %s %s = %s\n", p.paramName, p.typ, suitables[0].TypeString(defaultQualifier))
+			} else {
+				emit("\t\tvar %s %s\n", p.paramName, p.typ)
+				fillParams = append(fillParams, p)
 			}
-			emit("&%s", p.paramName)
 		}
-		emit(")\n")
-		// Avoid nil crash if we have pointer parameters.
-		emitNilChecks(emit, inputParams, localPkg)
+
+		if len(fillParams) > 0 {
+			// Third, create a fzgen.Fuzzer
+			emit("\t\tfz := fuzzer.NewFuzzer(data)\n")
+			// Fourth, emit a potentially wide Fill call for all the variables we declared.
+			emit("\t\tfz.Fill(")
+			for i, p := range fillParams {
+				if i > 0 {
+					emit(", ")
+				}
+				emit("&%s", p.paramName)
+			}
+			emit(")\n")
+			// Avoid nil crash if we have pointer parameters.
+			emitNilChecks(emit, inputParams, localPkg)
+		}
+
 		emit("\n")
 	default:
 		panic(fmt.Sprintf("unexpected result from checkParamSupport: %v", support))
@@ -413,8 +441,8 @@ const (
 // TODO: this is currently focuses on excluding the most common problems, and defaults to trying nativeSupport (which might cause cmd/go to complain).
 func checkParamSupport(
 	allWrapperParams []*types.Var,
-	supportedInterfaces map[string]mod.Interface,
-	existedFuncs map[string]mod.Func,
+	supportedInterfaces map[string]*mod.Interface,
+	existedFuncs []*mod.Func,
 ) (paramSupport, string) {
 	res := unknown
 	if len(allWrapperParams) == 0 {
@@ -476,19 +504,20 @@ func checkParamSupport(
 
 		// We might have updated t above. Switch to check if t is unsupported
 		// (which might have been an Elem of a slice or map, etc..)
-		switch t.Underlying().(type) {
+		switch u := t.Underlying().(type) {
 		case *types.Interface:
-			_, ok := supportedInterfaces[t.String()]
-			if !ok && !fuzzer.SupportedInterfaces[t.String()] {
+			typeName := t.String()
+			supportedinterface, ok := supportedInterfaces[typeName]
+			if !(ok && len(supportedinterface.Implementations) > 0) && !fuzzer.SupportedInterfaces[typeName] {
 				return noSupport, v.Type().String()
 			}
 			res = min(fillRequired, res)
 		case *types.Signature:
-			signature := t.String()
-			_, ok := existedFuncs[t.String()]
-			if !ok || len(signature) == 0 {
+			suitabels := mod.FindSuitables(u, existedFuncs)
+			if len(suitabels) == 0 {
 				return noSupport, v.Type().String()
 			}
+
 			res = min(fillRequired, res)
 		case *types.Chan:
 			return noSupport, v.Type().String()
