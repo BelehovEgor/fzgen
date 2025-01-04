@@ -24,18 +24,10 @@ const (
 	flagRequireExported
 )
 
-// Group our functions by package.
-// TODO: probably rename internal/mod to internal/pkg and move these items there.
-type pkg struct {
-	pkgPath      string
-	functions    []mod.Func
-	constructors []mod.Func
-}
-
 // findFuncsGrouped searches for requested functions matching a package pattern and func pattern,
 // returning them grouped by package.
-func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags findFuncFlag) ([]*pkg, error) {
-	report := func(err error) ([]*pkg, error) {
+func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags findFuncFlag) ([]*mod.Package, error) {
+	report := func(err error) ([]*mod.Package, error) {
 		return nil, fmt.Errorf("finding funcs: %v", err)
 	}
 
@@ -47,74 +39,53 @@ func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags 
 	if err != nil {
 		return report(err)
 	}
-	comboPattern := fmt.Sprintf("(%s)|(%s)", funcPattern, constructorPattern)
 
-	allFunctions, err := findFuncs(pkgPattern, comboPattern, nil, flags)
+	pkgs, err := findFuncs(pkgPattern, funcRe, constructorRe, nil, flags)
 	if err != nil {
 		return report(err)
 	}
 
-	// Group by package, and catagorize into candidate funcs and constructors.
-	m := make(map[string]*pkg)
-	for _, function := range allFunctions {
-		p := m[function.PkgPath]
-		if p == nil {
-			p = &pkg{pkgPath: function.PkgPath}
-			m[function.PkgPath] = p
-		}
-		if funcRe.MatchString(function.FuncName) {
-			p.functions = append(p.functions, function)
-		}
-		if isConstructor(function.TypesFunc) && constructorRe.MatchString(function.FuncName) {
-			p.constructors = append(p.constructors, function)
-		}
-	}
-
-	var pkgs []*pkg
-	for _, p := range m {
-		pkgs = append(pkgs, p)
+	for _, p := range pkgs {
 		// put constructors a deterministic order.
 		// TODO: for now, we'll prefer simpler constructors as approximated by length (so 'New' before 'NewSomething').
-		sort.Slice(p.constructors, func(i, j int) bool {
-			if len(p.constructors[i].FuncName) < len(p.constructors[j].FuncName) {
+		sort.Slice(p.Constructors, func(i, j int) bool {
+			if len(p.Constructors[i].FuncName) < len(p.Constructors[j].FuncName) {
 				return true
 			}
-			if len(p.constructors[i].FuncName) == len(p.constructors[j].FuncName) {
-				return p.constructors[i].FuncName < p.constructors[j].FuncName
+			if len(p.Constructors[i].FuncName) == len(p.Constructors[j].FuncName) {
+				return p.Constructors[i].FuncName < p.Constructors[j].FuncName
 			}
 			return false
 		})
 	}
 
 	sort.Slice(pkgs, func(i, j int) bool {
-		return pkgs[i].pkgPath < pkgs[j].pkgPath
+		return pkgs[i].PkgPath < pkgs[j].PkgPath
 	})
 
 	return pkgs, nil
 }
 
-// findFuncs searches for requested functions matching a package pattern and func pattern.
-// TODO: this is a temporary fork from fzgo/fuzz.FindFunc.
-// TODO: maybe change flags to a predicate function?
-func findFuncs(pkgPattern, funcPattern string, env []string, flags findFuncFlag) ([]mod.Func, error) {
+func findFuncs(
+	pkgPattern string,
+	funcPattern, conPattern *regexp.Regexp,
+	env []string,
+	flags findFuncFlag,
+) ([]*mod.Package, error) {
 	report := func(err error) error {
 		return fmt.Errorf("error while loading packages for pattern %v: %v", pkgPattern, err)
 	}
-	var result []mod.Func
 
-	// load packages based on our package pattern
-	// TODO: set build tags? Previously: BuildFlags: []string{buildTagsArg}, retain? probably not needed.
-	// build tags example: https://groups.google.com/d/msg/golang-tools/Adwr7jEyDmw/wQZ5qi8ZGAAJ
 	cfg := &packages.Config{
-		Mode: packages.LoadSyntax,
-		// TODO: packages.LoadSyntax is deprecated, so consider something similar to:
-		//    Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
-		// However, that specific change is not correct.
-		// With that change, 'fzgen -pkg=github.com/google/uuid' from an empty directory in
-		// a module with correct uuid 'require' fails with error:
-		//    error while loading packages for pattern github.com/google/uuid: failed to find directory for package "": exit status 1
-		// Note empty string for what should be the package path at "...directory for package %q"?
-		// Maybe revist only after restoring end-to-end testing via testscripts.
+		Mode: packages.NeedCompiledGoFiles |
+			packages.NeedDeps |
+			packages.NeedFiles |
+			packages.NeedImports |
+			packages.NeedName |
+			packages.NeedSyntax |
+			packages.NeedTypes |
+			packages.NeedTypesInfo |
+			packages.NeedTypesSizes,
 	}
 	if len(env) > 0 {
 		cfg.Env = env
@@ -127,66 +98,168 @@ func findFuncs(pkgPattern, funcPattern string, env []string, flags findFuncFlag)
 		return nil, fmt.Errorf("package load error for package pattern %v", pkgPattern)
 	}
 
-	// look for a func that starts with 'Fuzz' and matches our regexp.
-	// loop over the packages we found and loop over the Defs for each package.
+	return getPackagesContent(pkgs, env, funcPattern, conPattern, flags)
+}
+
+func getPackagesContent(
+	pkgs []*packages.Package,
+	env []string,
+	funcPattern, conPattern *regexp.Regexp,
+	flags findFuncFlag,
+) ([]*mod.Package, error) {
+	pkgsContent := make([]*mod.Package, 0)
+
 	for _, pkg := range pkgs {
-		pkgDir := ""
-		// TODO: consider alternative: "from a Package, look at Syntax.Scope.Objects and filter with ast.IsExported."
-		for id, obj := range pkg.TypesInfo.Defs {
-			// check if we have a func
-			f, ok := obj.(*types.Func)
-			if ok {
-				if isInterfaceRecv(f) {
-					// TODO: control via flag?
-					// TODO: merge back to fzgo/fuzz.FindFunc?
-					continue
-				}
-				if flags&flagExcludeFuzzPrefix != 0 && strings.HasPrefix(id.Name, "Fuzz") {
-					// skip any function that already starts with Fuzz
-					continue
-				}
-				if flags&flagRequireFuzzPrefix != 0 && !strings.HasPrefix(id.Name, "Fuzz") {
-					// skip any function that does not start with Fuzz
-					continue
-				}
-				if flags&flagRequireExported != 0 {
-					if !isExportedFunc(f) {
-						continue
-					}
-				}
+		content, err := getPackageContent(pkg, env, funcPattern, conPattern, flags)
 
-				matchedPattern, err := regexp.MatchString(funcPattern, id.Name)
-				if err != nil {
-					return nil, report(err)
-				}
-				if matchedPattern {
-					// found a match.
-					// check if we already found a match in a prior iteration our of chains.
-					if len(result) > 0 && flags&flagMultiMatch == 0 {
-						return nil, fmt.Errorf("multiple matches not allowed. multiple matches for pattern %v and func %v: %v.%v and %v.%v",
-							pkgPattern, funcPattern, pkg.PkgPath, id.Name, result[0].PkgPath, result[0].FuncName)
-					}
-					if pkgDir == "" {
-						pkgDir, err = goListDir(pkg.PkgPath, env)
-						if err != nil {
-							return nil, report(err)
-						}
-					}
+		if err != nil {
+			return nil, err
+		}
 
-					function := mod.Func{
-						FuncName: id.Name, PkgName: pkg.Name, PkgPath: pkg.PkgPath, PkgDir: pkgDir,
-						TypesFunc: f,
-					}
-					result = append(result, function)
-				}
+		pkgsContent = append(pkgsContent, content)
+	}
+
+	for _, pkgA := range pkgsContent {
+		for _, _pkgB := range pkgsContent {
+			setStructImplementedInterfaces(pkgA.Structs, _pkgB.Interfaces)
+		}
+	}
+
+	return pkgsContent, nil
+}
+
+func getPackageContent(
+	pkg *packages.Package,
+	env []string,
+	funcPattern, conPattern *regexp.Regexp,
+	flags findFuncFlag,
+) (*mod.Package, error) {
+	pkgDir := ""
+	var err error
+
+	targets := make([]mod.Func, 0)
+	constructors := make([]mod.Func, 0)
+	funcs := make([]mod.Func, 0)
+	structs := make([]mod.Struct, 0)
+	interfaces := make([]mod.Interface, 0)
+
+	for id, obj := range pkg.TypesInfo.Defs {
+		if pkgDir == "" {
+			pkgDir, err = goListDir(pkg.PkgPath, env)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		switch objType := obj.(type) {
+		case *types.TypeName:
+			if !obj.Exported() {
+				continue
+			}
+
+			objNamed := obj.Type().(*types.Named)
+			if types.IsInterface(objNamed) {
+				interfaces = append(interfaces, mod.Interface{
+					InterfaceName:  id.Name,
+					PkgName:        pkg.Name,
+					PkgPath:        pkg.PkgPath,
+					PkgDir:         pkgDir,
+					TypesInterface: objType.Type().Underlying().(*types.Interface),
+				})
+			} else if structType, ok := objType.Type().Underlying().(*types.Struct); ok {
+				structs = append(structs, mod.Struct{
+					StructName:  id.Name,
+					PkgName:     pkg.Name,
+					PkgPath:     pkg.PkgPath,
+					PkgDir:      pkgDir,
+					TypesStruct: structType,
+					TypesNamed:  objNamed,
+				})
+			}
+		case *types.Func:
+			f := mod.Func{
+				FuncName:  id.Name,
+				PkgName:   pkg.Name,
+				PkgPath:   pkg.PkgPath,
+				PkgDir:    pkgDir,
+				TypesFunc: objType,
+			}
+
+			funcs = append(funcs, f)
+			addTarget(&targets, f, funcPattern, flags)
+			addConstructor(&constructors, f, conPattern)
+		}
+	}
+
+	return &mod.Package{
+		PkgName:      pkg.Name,
+		PkgPath:      pkg.PkgPath,
+		Targets:      targets,
+		Constructors: constructors,
+		Funcs:        funcs,
+		Structs:      structs,
+		Interfaces:   interfaces,
+	}, nil
+}
+
+func addTarget(targets *[]mod.Func, f mod.Func, funcPattern *regexp.Regexp, flags findFuncFlag) error {
+	if isInterfaceRecv(f.TypesFunc) {
+		// TODO: control via flag?
+		// TODO: merge back to fzgo/fuzz.FindFunc?
+		return nil
+	}
+	if flags&flagExcludeFuzzPrefix != 0 && strings.HasPrefix(f.FuncName, "Fuzz") {
+		// skip any function that already starts with Fuzz
+		return nil
+	}
+	if flags&flagRequireFuzzPrefix != 0 && !strings.HasPrefix(f.FuncName, "Fuzz") {
+		// skip any function that does not start with Fuzz
+		return nil
+	}
+	if flags&flagRequireExported != 0 {
+		if !isExportedFunc(f.TypesFunc) {
+			return nil
+		}
+	}
+
+	if funcPattern.MatchString(f.FuncName) {
+		// found a match.
+		// check if we already found a match in a prior iteration our of chains.
+		if len(*targets) > 0 && flags&flagMultiMatch == 0 {
+			return fmt.Errorf("multiple matches not allowed. multiple matches for func %v: %v.%v and %v.%v",
+				funcPattern, f.PkgPath, f.FuncName, (*targets)[0].PkgPath, (*targets)[0].FuncName)
+		}
+
+		*targets = append(*targets, f)
+	}
+
+	return nil
+}
+
+func addConstructor(constructors *[]mod.Func, f mod.Func, constructorRe *regexp.Regexp) {
+	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) {
+		*constructors = append(*constructors, f)
+	}
+}
+
+func setStructImplementedInterfaces(structs []mod.Struct, interfaces []mod.Interface) {
+	for _, _struct := range structs {
+		for _, _interface := range interfaces {
+			if types.AssignableTo(_struct.TypesNamed, _interface.TypesInterface) {
+				_interface.Implementations = append(_interface.Implementations, _struct)
+			} else if types.AssignableTo(types.NewPointer(_struct.TypesNamed), _interface.TypesInterface) {
+				_interface.Implementations = append(_interface.Implementations, mod.Struct{
+					StructName:  _struct.StructName,
+					PkgName:     _struct.PkgName,
+					PkgPath:     _struct.PkgPath,
+					PkgDir:      _struct.PkgDir,
+					TypesStruct: _struct.TypesStruct,
+					TypesNamed:  _struct.TypesNamed,
+					AsPointer:   true,
+				})
 			}
 		}
 	}
-	// done looking
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no matching funcs found for package pattern %q", pkgPattern)
-	}
-	return result, nil
 }
 
 // goListDir returns the dir for a package import path.
@@ -293,7 +366,8 @@ func isExportedFunc(f *types.Func) bool {
 
 // isInterfaceRecv helps filter out interface receivers such as 'func (interface).Is(error) bool'
 // Previously would have issues from errors.Is:
-//    x, ok := err.(interface{ Is(error) bool }); ok && x.Is(target)
+//
+//	x, ok := err.(interface{ Is(error) bool }); ok && x.Is(target)
 func isInterfaceRecv(f *types.Func) bool {
 	sig, ok := f.Type().(*types.Signature)
 	if !ok {

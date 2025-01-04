@@ -16,8 +16,8 @@ import (
 // Each wrapper consists of a target from a constructor and a set of steps that include invoking methods on the target.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
-func emitChainWrappers(pkgPath string, pkgFuncs *pkg, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
-	possibleConstructors := pkgFuncs.constructors
+func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
+	possibleConstructors := pkgFuncs.Constructors
 	if len(possibleConstructors) == 0 {
 		return nil, errNoConstructorsMatch
 	}
@@ -30,7 +30,7 @@ func emitChainWrappers(pkgPath string, pkgFuncs *pkg, wrapperPkgName string, opt
 		steps        []mod.Func
 	}
 	recvTypes := make(map[string]*chain)
-	for _, function := range pkgFuncs.functions {
+	for _, function := range pkgFuncs.Targets {
 		// recvN will be the named type if the receiver is a pointer receiver.
 		recvN := receiver(function.TypesFunc)
 		if recvN == nil {
@@ -322,7 +322,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 
 	// Check if we have an interface or function pointer in our desired parameters,
 	// which we can't fill with values during fuzzing.
-	support, unsupportedParam := checkParamSupport(inputParams)
+	support, unsupportedParam := checkParamSupport(inputParams, nil, nil)
 	if support == noSupport {
 		// we can't emit this chain target.
 		emit("// skipping %s because parameters include func, chan, or unsupported interface: %v\n\n", wrapperName, unsupportedParam)
@@ -467,7 +467,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 
 	// Check if we have an interface or function pointer in our desired parameters,
 	// which we can't fill with values during fuzzing.
-	support, unsupportedParam := checkParamSupport(inputParams)
+	support, unsupportedParam := checkParamSupport(inputParams, nil, nil)
 	if support == noSupport {
 		// skip this wrapper.
 		emit("// skipping %s because parameters include func, chan, or unsupported interface: %v\n\n", wrapperName, unsupportedParam)

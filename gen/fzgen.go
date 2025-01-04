@@ -2,14 +2,14 @@
 // for the fzgen command.
 //
 // See the project README for additional information:
-//     https://github.com/thepudds/fzgen
+//
+//	https://github.com/thepudds/fzgen
 package gen
 
 import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -131,18 +131,18 @@ func FzgenMain() int {
 	// Loop over our packages, and start our real work.
 	var generatedFiles int
 	for i := range pkgs {
-		if len(pkgs[i].functions) == 0 {
+		if len(pkgs[i].Targets) == 0 {
 			continue
 		}
 
 		// Determine what output file we will create, and what package name we will use in it.
 		var wrapperPkgName string
 		outFile := *outFileFlag
-		targetPkgName := pkgs[i].functions[0].PkgName
+		targetPkgName := pkgs[i].Targets[0].PkgName
 		switch {
 		case len(pkgs) > 1:
 			// Specifying multiple packages via a pattern creates an output file in each package's directory.
-			outFile = filepath.Join(pkgs[i].functions[0].PkgDir, outFile)
+			outFile = filepath.Join(pkgs[i].Targets[0].PkgDir, outFile)
 			wrapperPkgName = targetPkgName
 		case len(pkgs) == 1:
 			// When the target is a single package overall, we default to placing the output file in the working directory,
@@ -164,7 +164,7 @@ func FzgenMain() int {
 		if err != nil {
 			fail(err)
 		}
-		targetDir, err := filepath.Abs(pkgs[i].functions[0].PkgDir)
+		targetDir, err := filepath.Abs(pkgs[i].Targets[0].PkgDir)
 		if err != nil {
 			fail(err)
 		}
@@ -184,14 +184,14 @@ func FzgenMain() int {
 		// Do the actual work of emitting our wrappers.
 		var out []byte
 		if !*chainFlag {
-			out, err = emitIndependentWrappers(pkgs[i].pkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
+			out, err = emitIndependentWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
 		} else {
-			out, err = emitChainWrappers(pkgs[i].pkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
+			out, err = emitChainWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
 		}
 		// Handle certain common errors gracefully, including skipping & continuing if multiple target packages.
 		msgDest, msgPrefix := os.Stderr, "fzgen:"
 		if len(pkgs) > 1 {
-			msgDest, msgPrefix = os.Stdout, fmt.Sprintf("fzgen: skipping %s:", pkgs[i].pkgPath)
+			msgDest, msgPrefix = os.Stdout, fmt.Sprintf("fzgen: skipping %s:", pkgs[i].PkgPath)
 		}
 		switch {
 		case errors.Is(err, errUnsupportedParams), errors.Is(err, errNoMethodsMatch), errors.Is(err, errNoSteps), errors.Is(err, errNoFunctionsMatch):
@@ -226,7 +226,7 @@ func FzgenMain() int {
 		}
 
 		// Write the output.
-		err = ioutil.WriteFile(outFile, adjusted, 0o644)
+		err = os.WriteFile(outFile, adjusted, 0o644)
 		if err != nil {
 			fail(err)
 		}

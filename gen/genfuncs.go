@@ -34,8 +34,8 @@ var (
 // emitIndependentWrappers emits fuzzing wrappers where possible for the list of functions passed in.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
-func emitIndependentWrappers(pkgPath string, pkgFuncs *pkg, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
-	if len(pkgFuncs.functions) == 0 {
+func emitIndependentWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
+	if len(pkgFuncs.Targets) == 0 {
 		return nil, fmt.Errorf("%w: 0 matching functions", errNoFunctionsMatch)
 	}
 
@@ -58,25 +58,28 @@ func emitIndependentWrappers(pkgPath string, pkgFuncs *pkg, wrapperPkgName strin
 	emit(")\n\n")
 
 	// put our functions we want to wrap into a deterministic order
-	sort.Slice(pkgFuncs.functions, func(i, j int) bool {
+	sort.Slice(pkgFuncs.Targets, func(i, j int) bool {
 		// types.Func.String outputs strings like:
 		//   func (github.com/thepudds/fzgo/genfuzzfuncs/examples/test-constructor-injection.A).ValMethodWithArg(i int) bool
 		// works ok for clustering results, though pointer receiver and non-pointer receiver methods don't cluster.
 		// could strip '*' or sort another way, but probably ok, at least for now.
-		return pkgFuncs.functions[i].TypesFunc.String() < pkgFuncs.functions[j].TypesFunc.String()
+		return pkgFuncs.Targets[i].TypesFunc.String() < pkgFuncs.Targets[j].TypesFunc.String()
 	})
+
+	supportedInterfaces := pkgFuncs.GetSupportedInterfaces()
+	existsFunctions := pkgFuncs.GetExistedFunctions()
 
 	// Loop over our the functions we are wrapping, emitting a wrapper where possible.
 	// We only return an error if all fail.
 	var firstErr error
 	var success bool
-	for _, function := range pkgFuncs.functions {
+	for _, function := range pkgFuncs.Targets {
 		var constructors []mod.Func
 		if options.insertConstructors {
-			for _, constructor := range pkgFuncs.constructors {
+			for _, constructor := range pkgFuncs.Constructors {
 				// Skip over any candidate constructors with unsupported params.
 				ctorInputParams := params(constructor.TypesFunc)
-				support, _ := checkParamSupport(ctorInputParams)
+				support, _ := checkParamSupport(ctorInputParams, supportedInterfaces, existsFunctions)
 				if support == noSupport {
 					continue
 				}
@@ -84,7 +87,7 @@ func emitIndependentWrappers(pkgPath string, pkgFuncs *pkg, wrapperPkgName strin
 			}
 		}
 
-		err := emitIndependentWrapper(emit, function, constructors, options.qualifyAll)
+		err := emitIndependentWrapper(emit, function, constructors, supportedInterfaces, existsFunctions, options.qualifyAll)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -112,7 +115,13 @@ type paramRepr struct {
 // It takes a list of possible constructors to insert into the wrapper body if the
 // constructor is suitable for creating the receiver of a wrapped method.
 // qualifyAll indicates if all variables should be qualified with their package.
-func emitIndependentWrapper(emit emitFunc, function mod.Func, constructors []mod.Func, qualifyAll bool) error {
+func emitIndependentWrapper(
+	emit emitFunc,
+	function mod.Func,
+	constructors []mod.Func,
+	supportedInterfaces map[string]mod.Interface,
+	existedFuncs map[string]mod.Func,
+	qualifyAll bool) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
@@ -193,7 +202,7 @@ func emitIndependentWrapper(emit emitFunc, function mod.Func, constructors []mod
 	// Check if we have an interface or function pointer in our desired parameters,
 	// which we can't fill with values during fuzzing.
 
-	support, unsupportedParam := checkParamSupport(inputParams)
+	support, unsupportedParam := checkParamSupport(inputParams, supportedInterfaces, existedFuncs)
 	if support == noSupport {
 		// skip this wrapper.
 		emit("// skipping %s because parameters include func, chan, or unsupported interface: %v\n\n", wrapperName, unsupportedParam)
@@ -206,6 +215,7 @@ func emitIndependentWrapper(emit emitFunc, function mod.Func, constructors []mod
 	emit("\tf.Fuzz(func(t *testing.T, ")
 
 	switch support {
+	// TODO create flag that can switch off native support because it is not supported by oss fuzz
 	case nativeSupport:
 		// The result for this line will end up similar to:
 		//    f.Fuzz(func(t *testing.T, s string, i int) {
@@ -337,7 +347,16 @@ func emitNilChecks(emit emitFunc, allParams []*types.Var, localPkg *types.Packag
 // A target that is not "" indicates the caller wants to use a
 // specific target name in place of any receiver name.
 // For example, a target set to "target" would result in "target.Load(key)".
-func emitWrappedFunc(emit emitFunc, f *types.Func, wrappedSig *types.Signature, target string, collisionOffset int, qualifyAll bool, allParams []*types.Var, localPkg *types.Package) {
+func emitWrappedFunc(
+	emit emitFunc,
+	f *types.Func,
+	wrappedSig *types.Signature,
+	target string,
+	collisionOffset int,
+	qualifyAll bool,
+	allParams []*types.Var,
+	localPkg *types.Package,
+) {
 	recv := wrappedSig.Recv()
 	switch {
 	case recv != nil && target != "":
@@ -359,7 +378,13 @@ func emitWrappedFunc(emit emitFunc, f *types.Func, wrappedSig *types.Signature, 
 
 // emitArgs emits the arguments needed to call a signature, including handling renaming arguments
 // based on collisions with package name or other parameters.
-func emitArgs(emit emitFunc, sig *types.Signature, collisionOffset int, localPkg *types.Package, allWrapperParams []*types.Var) {
+func emitArgs(
+	emit emitFunc,
+	sig *types.Signature,
+	collisionOffset int,
+	localPkg *types.Package,
+	allWrapperParams []*types.Var,
+) {
 	for i := 0; i < sig.Params().Len(); i++ {
 		v := sig.Params().At(i)
 		paramName := avoidCollision(v, i+collisionOffset, localPkg, allWrapperParams)
@@ -386,7 +411,11 @@ const (
 // checkParamSupport reports the level of support across the input parameters.
 // It stops checking if it finds a param that is noSupport.
 // TODO: this is currently focuses on excluding the most common problems, and defaults to trying nativeSupport (which might cause cmd/go to complain).
-func checkParamSupport(allWrapperParams []*types.Var) (paramSupport, string) {
+func checkParamSupport(
+	allWrapperParams []*types.Var,
+	supportedInterfaces map[string]mod.Interface,
+	existedFuncs map[string]mod.Func,
+) (paramSupport, string) {
 	res := unknown
 	if len(allWrapperParams) == 0 {
 		// An easy case that is handled by cmd/go is no params at all.
@@ -449,11 +478,19 @@ func checkParamSupport(allWrapperParams []*types.Var) (paramSupport, string) {
 		// (which might have been an Elem of a slice or map, etc..)
 		switch t.Underlying().(type) {
 		case *types.Interface:
-			if !fuzzer.SupportedInterfaces[t.String()] {
+			_, ok := supportedInterfaces[t.String()]
+			if !ok && !fuzzer.SupportedInterfaces[t.String()] {
 				return noSupport, v.Type().String()
 			}
 			res = min(fillRequired, res)
-		case *types.Signature, *types.Chan:
+		case *types.Signature:
+			signature := t.String()
+			_, ok := existedFuncs[t.String()]
+			if !ok || len(signature) == 0 {
+				return noSupport, v.Type().String()
+			}
+			res = min(fillRequired, res)
+		case *types.Chan:
 			return noSupport, v.Type().String()
 		}
 
