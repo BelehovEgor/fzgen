@@ -1,5 +1,7 @@
 package supportedinterface
 
+import "fmt"
+
 type Printer interface {
 	Print(s string) int
 }
@@ -37,4 +39,8 @@ type A struct {
 
 func (a A) Do(printer Printer) bool {
 	return true
+}
+
+func MySubEmitter(lvl int, format string, args ...interface{}) {
+	fmt.Printf(format, args...)
 }

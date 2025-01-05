@@ -2,25 +2,51 @@ package mod
 
 import "go/types"
 
-func (s *Struct) GetNotNativeTypes() []*types.Var {
-	notNative := make([]*types.Var, 0)
-	for i := 0; i < s.TypesStruct.NumFields(); i++ {
-		field := s.TypesStruct.Field(i)
+func (s *Struct) GetNotNativeTypes() map[*types.Var]bool {
+	return getNotNativeTypes(s.TypesStruct, 1)
+}
+
+func HasNotNative(s *Struct) bool {
+	return hasNotNative(s.TypesStruct, 1)
+}
+
+func GetInputParams(function *Func) []*types.Var {
+	f := function.TypesFunc
+	wrappedSig := f.Type().(*types.Signature)
+	var inputParams []*types.Var
+
+	for i := 0; i < wrappedSig.Params().Len(); i++ {
+		v := wrappedSig.Params().At(i)
+		inputParams = append(inputParams, v)
+	}
+
+	return inputParams
+}
+
+func getNotNativeTypes(s *types.Struct, depth int) map[*types.Var]bool {
+	if depth > maxDepth {
+		return nil
+	}
+
+	notNative := make(map[*types.Var]bool)
+	for i := 0; i < s.NumFields(); i++ {
+		field := s.Field(i)
 		switch u := field.Type().Underlying().(type) {
 		case *types.Interface, *types.Signature:
-			notNative = append(notNative, field)
+			notNative[field] = true
 		case *types.Struct:
-			if hasNotNative(u, 1) {
-				notNative = append(notNative, field)
+			fieldNotNative := getNotNativeTypes(u, depth+1)
+			if fieldNotNative == nil {
+				continue
+			}
+
+			for v := range fieldNotNative {
+				notNative[v] = true
 			}
 		}
 	}
 
 	return notNative
-}
-
-func HasNotNative(s *Struct) bool {
-	return hasNotNative(s.TypesStruct, 1)
 }
 
 func hasNotNative(s *types.Struct, depth int) bool {

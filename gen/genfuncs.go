@@ -76,6 +76,12 @@ func emitIndependentWrappers(
 	supportedStructs := pkgsPatternContent.GetSupportedStructs()
 	existedFuncs := pkgsPatternContent.Funcs
 
+	defaultQualifier, _ := qualifiers(pkgFuncs.Targets[0].TypesFunc.Pkg(), options.qualifyAll)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, defaultQualifier)
+	for _, value := range fabrics {
+		emit("%s\n", value.Body)
+	}
+
 	// Loop over our the functions we are wrapping, emitting a wrapper where possible.
 	// We only return an error if all fail.
 	var firstErr error

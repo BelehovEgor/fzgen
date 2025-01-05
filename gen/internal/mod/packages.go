@@ -30,13 +30,21 @@ func (f *Func) GetSignature() *types.Signature {
 	return f.TypesFunc.Type().(*types.Signature)
 }
 
-func (s *Func) TypeString(qualifier types.Qualifier) string {
-	prefix := qualifier(s.TypesFunc.Pkg())
+func (f *Func) TypeString(qualifier types.Qualifier) string {
+	prefix := qualifier(f.TypesFunc.Pkg())
 	if prefix == "" {
-		return s.FuncName
+		return f.FuncName
 	}
 
-	return fmt.Sprintf("%s.%s", prefix, s.FuncName)
+	return fmt.Sprintf("%s.%s", prefix, f.FuncName)
+}
+
+func (f *Func) Import() string {
+	return fmt.Sprintf(
+		"%s (%s)",
+		f.PkgName,
+		f.PkgPath,
+	)
 }
 
 type Struct struct {
@@ -70,6 +78,10 @@ type Interface struct {
 
 func (i Interface) String() string {
 	return i.TypesNamed.String()
+}
+
+func (i Interface) TypeString(qualifier types.Qualifier) string {
+	return types.TypeString(i.TypesNamed, qualifier)
 }
 
 type Package struct {
