@@ -35,7 +35,7 @@ var (
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
 func emitIndependentWrappers(
-	pkgPath string,
+	outPkgPath string,
 	pkgFuncs *mod.Package,
 	pkgsPatternContent *mod.PackagePattern,
 	wrapperPkgName string,
@@ -52,17 +52,6 @@ func emitIndependentWrappers(
 		fmt.Fprintf(w, format, args...)
 	}
 
-	// emit the intro material
-	emit("package %s\n\n", wrapperPkgName)
-	emit(options.topComment)
-	emit("import (\n")
-	emit("\t\"testing\"\n")
-	if options.qualifyAll {
-		emit("\t\"%s\"\n", pkgPath)
-	}
-	emit("\t\"github.com/thepudds/fzgen/fuzzer\"\n")
-	emit(")\n\n")
-
 	// put our functions we want to wrap into a deterministic order
 	sort.Slice(pkgFuncs.Targets, func(i, j int) bool {
 		// types.Func.String outputs strings like:
@@ -76,8 +65,20 @@ func emitIndependentWrappers(
 	supportedStructs := pkgsPatternContent.GetSupportedStructs()
 	existedFuncs := pkgsPatternContent.Funcs
 
-	defaultQualifier, _ := qualifiers(pkgFuncs.Targets[0].TypesFunc.Pkg(), options.qualifyAll)
-	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, defaultQualifier)
+	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, qualifier.Qualifier)
+
+	// emit the intro material
+	emit("package %s\n\n", wrapperPkgName)
+	emit(options.topComment)
+	emit("import (\n")
+
+	for _, importStr := range qualifier.GetImportStrings() {
+		emit("\t%s\n", importStr)
+	}
+
+	emit(")\n\n")
+
 	for _, value := range fabrics {
 		emit("%s\n", value.Body)
 	}
@@ -101,7 +102,7 @@ func emitIndependentWrappers(
 		}
 
 		err := emitIndependentWrapper(
-			emit, *function, constructors, supportedInterfaces, supportedStructs, existedFuncs, options.qualifyAll)
+			emit, *function, constructors, supportedInterfaces, supportedStructs, existedFuncs, qualifier.Qualifier)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -136,17 +137,13 @@ func emitIndependentWrapper(
 	supportedInterfaces map[string]*mod.Interface,
 	supportedStructs map[string]*mod.Struct,
 	existedFuncs []*mod.Func,
-	qualifyAll bool) error {
+	qualifier types.Qualifier) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
 		return fmt.Errorf("function %s is not *types.Signature (%+v)", function, f)
 	}
 	localPkg := f.Pkg()
-
-	// Set up types.Qualifier funcs we can use with the types package
-	// to scope variables by a package or not.
-	defaultQualifier, localQualifier := qualifiers(localPkg, qualifyAll)
 
 	// Get our receiver, which might be nil if we don't have a receiver
 	recv := wrappedSig.Recv()
@@ -163,7 +160,7 @@ func emitIndependentWrapper(
 			fmt.Fprintf(os.Stderr, "genfuzzfuncs: warning: createWrapper: failed to determine receiver type: %v: %v\n", recv, err)
 			return nil
 		}
-		recvNamedTypeLocalName := types.TypeString(n.Obj().Type(), localQualifier)
+		recvNamedTypeLocalName := n.Obj().Name()
 		wrapperName = fmt.Sprintf("Fuzz_%s_%s", recvNamedTypeLocalName, f.Name())
 	}
 
@@ -209,7 +206,7 @@ func emitIndependentWrapper(
 
 	paramReprs := make([]paramRepr, len(inputParams))
 	for i, v := range inputParams {
-		typeStringWithSelector := types.TypeString(v.Type(), defaultQualifier)
+		typeStringWithSelector := types.TypeString(v.Type(), qualifier)
 		paramName := avoidCollision(v, i, localPkg, inputParams)
 		paramReprs[i] = paramRepr{paramName: paramName, typ: typeStringWithSelector, v: v}
 	}
@@ -263,16 +260,16 @@ func emitIndependentWrapper(
 		fillParams := make([]paramRepr, 0)
 		for _, p := range paramReprs {
 			if pkgInterface, ok := supportedInterfaces[p.v.Type().String()]; ok {
-				initLines := pkgInterface.GetConstructors(p.paramName, defaultQualifier, supportedInterfaces, existedFuncs)
+				initLines := pkgInterface.GetConstructors(p.paramName, qualifier, supportedInterfaces, existedFuncs)
 				emit(initLines[0])
 				fillParams = append(fillParams, p)
 			} else if pkgStruct, ok := supportedStructs[p.v.Type().String()]; ok && mod.HasNotNative(pkgStruct) {
-				initLines := pkgStruct.Initialize(p.paramName, defaultQualifier, supportedInterfaces, existedFuncs)
+				initLines := pkgStruct.Initialize(p.paramName, qualifier, supportedInterfaces, existedFuncs)
 				emit(initLines)
 				fillParams = append(fillParams, p)
 			} else if signature, ok := p.v.Type().Underlying().(*types.Signature); ok {
 				suitables := mod.FindSuitables(signature, existedFuncs)
-				emit("\t\tvar %s %s = %s\n", p.paramName, p.typ, suitables[0].TypeString(defaultQualifier))
+				emit("\t\tvar %s %s = %s\n", p.paramName, p.typ, suitables[0].TypeString(qualifier))
 			} else {
 				emit("\t\tvar %s %s\n", p.paramName, p.typ)
 				fillParams = append(fillParams, p)
@@ -319,11 +316,7 @@ func emitIndependentWrapper(
 				emit(", err")
 			}
 			emit(" := ")
-			if qualifyAll {
-				emit("%s.%s(", localPkg.Name(), ctorReplace.f.Name())
-			} else {
-				emit("%s(", ctorReplace.f.Name())
-			}
+			emit("%s(", ctorReplace.f.TypeString(qualifier))
 			emitArgs(emit, ctorReplace.sig, 0, localPkg, inputParams)
 			emit(")\n")
 			if ctorReplace.secondResultIsErr {
@@ -342,7 +335,7 @@ func emitIndependentWrapper(
 	}
 
 	// Emit the call to the wrapped function.
-	emitWrappedFunc(emit, f, wrappedSig, "", collisionOffset, qualifyAll, inputParams, localPkg)
+	emitWrappedFunc(emit, function, wrappedSig, "", collisionOffset, inputParams, localPkg, qualifier)
 	emit("\t})\n")
 	emit("}\n\n")
 
@@ -383,27 +376,25 @@ func emitNilChecks(emit emitFunc, allParams []*types.Var, localPkg *types.Packag
 // For example, a target set to "target" would result in "target.Load(key)".
 func emitWrappedFunc(
 	emit emitFunc,
-	f *types.Func,
+	f mod.Func,
 	wrappedSig *types.Signature,
 	target string,
 	collisionOffset int,
-	qualifyAll bool,
 	allParams []*types.Var,
 	localPkg *types.Package,
+	qualifier types.Qualifier,
 ) {
 	recv := wrappedSig.Recv()
 	switch {
 	case recv != nil && target != "":
 		// Use target in place of the existing receiver, only doing this when we have a receiver.
 		// (If there is no receiver, target isn't useful).
-		emit("\t%s.%s(", target, f.Name())
+		emit("\t%s.%s(", target, f.TypeString(qualifier))
 	case recv != nil:
 		recvName := avoidCollision(recv, 0, localPkg, allParams)
-		emit("\t%s.%s(", recvName, f.Name())
-	case qualifyAll:
-		emit("\t%s.%s(", localPkg.Name(), f.Name())
+		emit("\t%s.%s(", recvName, f.TypeString(qualifier))
 	default:
-		emit("\t%s(", f.Name())
+		emit("\t%s(", f.TypeString(qualifier))
 	}
 	// emit the arguments to the wrapped function.
 	emitArgs(emit, wrappedSig, collisionOffset, localPkg, allParams)
@@ -452,9 +443,6 @@ func checkParamSupport(
 ) (paramSupport, string) {
 	res := unknown
 	if len(allWrapperParams) == 0 {
-		// An easy case that is handled by cmd/go is no params at all.
-		// This doesn't currently happen with independent wrappers, but does happen with chain wrappers
-		// that are targeting a method with no params.
 		return nativeSupport, ""
 	}
 	min := func(a, b paramSupport) paramSupport {
@@ -464,75 +452,94 @@ func checkParamSupport(
 		}
 		return b
 	}
+
 	for _, v := range allWrapperParams {
-		// basic checking for interfaces, funcs, or pointers or slices of interfaces or funcs.
-		// TODO: should do a more comprehensive check, perhaps recursive, including handling cycles, but keep it simple for now.
-		// TODO: alt, invert this to check for things we believe cmd/go supports and disallow things we know we can't fill?
-		t := v.Type()
-		t = stripPointers(t, 0)
-		if t != v.Type() {
-			// Stripped at least one pointer. Mark that we will need to fill *if* the other checks also pass,
-			// but we know our best case is to fill (thoug we might also mark noSupport down below after the other checks).
-			res = min(fillRequired, res)
+		vSupport, err := checkVarSupport(v.Type(), supportedInterfaces, existedFuncs)
+
+		if err != "" {
+			return noSupport, err
 		}
 
-		// TODO: I thought cmd/go supported named types like MyInt, but seemingly not. Add quick check here, which should
-		// give correct result, but leave rest of logic as is for now (even though some is redundant w/ this check).
-		if t != t.Underlying() {
-			res = min(fillRequired, res)
-		}
-
-		// Switch to check if we might be able to fill this type.
-		switch u := t.Underlying().(type) {
-		case *types.Slice:
-			t = u.Elem()
-			tt, ok := t.(*types.Basic)
-			if ok && tt.Kind() == types.Byte {
-				res = min(nativeSupport, res) // TODO: does cmd/go support more slices than []byte?
-			} else {
-				res = min(fillRequired, res)
-			}
-		case *types.Array:
-			t = u.Elem()
-			res = min(fillRequired, res)
-		case *types.Map:
-			t = u.Elem() // basic attempt to check for something like map[string]io.Reader below.
-			res = min(fillRequired, res)
-		case *types.Struct:
-			res = min(fillRequired, res)
-		case *types.Basic:
-			switch u.Kind() {
-			case types.Uintptr, types.UnsafePointer, types.Complex64, types.Complex128:
-				// fz.Fill handles complex, and fills Uintptr and UnsafePointer with nil, which is hopefully reasonable choice.
-				res = min(fillRequired, res)
-			}
-		}
-
-		// We might have updated t above. Switch to check if t is unsupported
-		// (which might have been an Elem of a slice or map, etc..)
-		switch u := t.Underlying().(type) {
-		case *types.Interface:
-			typeName := t.String()
-			supportedinterface, ok := supportedInterfaces[typeName]
-			if !(ok && len(supportedinterface.Implementations) > 0) && !fuzzer.SupportedInterfaces[typeName] {
-				return noSupport, v.Type().String()
-			}
-			res = min(fillRequired, res)
-		case *types.Signature:
-			suitabels := mod.FindSuitables(u, existedFuncs)
-			if len(suitabels) == 0 {
-				return noSupport, v.Type().String()
-			}
-
-			res = min(fillRequired, res)
-		case *types.Chan:
-			return noSupport, v.Type().String()
-		}
-
-		// If we didn't easily find a problematic type above, we'll guess that cmd/go supports it,
-		// and let cmd/go complain if it needs to for more complex cases not handled above.
-		res = min(nativeSupport, res)
+		res = min(res, vSupport)
 	}
+	return res, ""
+}
+
+func checkVarSupport(
+	t types.Type,
+	supportedInterfaces map[string]*mod.Interface,
+	existedFuncs []*mod.Func,
+) (paramSupport, string) {
+	min := func(a, b paramSupport) paramSupport {
+		// TODO: use generics in 1.18 ;-)
+		if a < b {
+			return a
+		}
+		return b
+	}
+
+	res := unknown
+
+	if t != t.Underlying() {
+		res = min(fillRequired, res)
+	}
+
+	// Switch to check if we might be able to fill this type.
+	switch u := t.Underlying().(type) {
+	case *types.Pointer:
+		vRes, err := checkVarSupport(u.Elem(), supportedInterfaces, existedFuncs)
+		if err != "" {
+			return res, err
+		}
+		res = min(fillRequired, vRes)
+	case *types.Slice:
+		vRes, err := checkVarSupport(u.Elem(), supportedInterfaces, existedFuncs)
+		if err != "" {
+			return res, err
+		}
+		res = min(fillRequired, vRes)
+	case *types.Array:
+		vRes, err := checkVarSupport(u.Elem(), supportedInterfaces, existedFuncs)
+		if err != "" {
+			return res, err
+		}
+		res = min(fillRequired, vRes)
+	case *types.Map:
+		vRes, err := checkVarSupport(u.Elem(), supportedInterfaces, existedFuncs)
+		if err != "" {
+			return res, err
+		}
+		res = min(fillRequired, vRes)
+	case *types.Struct:
+		res = min(fillRequired, res)
+	case *types.Interface:
+		typeName := t.String()
+		supportedinterface, ok := supportedInterfaces[typeName]
+		if !(ok && len(supportedinterface.Implementations) > 0) && !fuzzer.SupportedInterfaces[typeName] {
+			return noSupport, t.String()
+		}
+		res = min(fillRequired, res)
+	case *types.Signature:
+		suitabels := mod.FindSuitables(u, existedFuncs)
+		if len(suitabels) == 0 {
+			return noSupport, t.String()
+		}
+
+		res = min(fillRequired, res)
+	case *types.Chan:
+		return noSupport, t.String()
+	case *types.Basic:
+		switch u.Kind() {
+		case types.Uintptr, types.UnsafePointer, types.Complex64, types.Complex128:
+			// fz.Fill handles complex, and fills Uintptr and UnsafePointer with nil, which is hopefully reasonable choice.
+			res = min(fillRequired, res)
+		}
+	}
+
+	// If we didn't easily find a problematic type above, we'll guess that cmd/go supports it,
+	// and let cmd/go complain if it needs to for more complex cases not handled above.
+	res = min(nativeSupport, res)
+
 	return res, ""
 }
 
@@ -542,7 +549,7 @@ func checkParamSupport(
 // Sig is nil if a suitable constructor was not found.
 type ctorMatch struct {
 	sig               *types.Signature
-	f                 *types.Func
+	f                 mod.Func
 	ctorResultN       *types.Named // TODO: no longer need this, probably
 	secondResultIsErr bool
 }
@@ -609,7 +616,7 @@ func constructorMatch(recv *types.Var, possibleCtor mod.Func) (ctorMatch, error)
 		// we need for the method we are trying to fuzz! (ignoring a pointer, which we stripped off above).
 		match := ctorMatch{
 			sig:               ctorSig,
-			f:                 possibleCtor.TypesFunc,
+			f:                 possibleCtor,
 			ctorResultN:       ctorResultN,
 			secondResultIsErr: secondResultIsErr,
 		}
@@ -658,50 +665,6 @@ func avoidCollision(v *types.Var, i int, localPkg *types.Package, allWrapperPara
 		paramName = fmt.Sprintf("%s%d", string([]rune(paramName)[0]), i+1)
 	}
 	return paramName
-}
-
-// qualifiers sets up a types.Qualifier func we can use with the types package,
-// paying attention to whether we are qualifying everything or not.
-func qualifiers(localPkg *types.Package, qualifyAll bool) (defaultQualifier, localQualifier types.Qualifier) {
-	localQualifier = func(pkg *types.Package) string {
-		// We call pkg.Path() here because in some cases, such as the Options type from:
-		//    fzgen -func=Close$ -qualifyall=false tailscale.com/logtail/filch
-		// two packages that appear to be equal and have the same internal path field do not
-		// have pointer equality.
-		// The prior problem was the Options type would be emitted as 'filch.Options',
-		// rather than the expected 'Options'. Comparing paths here resolves that.
-		// TODO: understand better why two *Types.packages with same path do not have pointer equality.
-		// TODO: consider using types.RelativeTo, though that also does pointer equality test.
-		if pkg.Path() == localPkg.Path() {
-			return ""
-		}
-		return pkg.Name()
-	}
-	if qualifyAll {
-		defaultQualifier = externalQualifier
-	} else {
-		defaultQualifier = localQualifier
-	}
-	return defaultQualifier, localQualifier
-}
-
-// externalQualifier can be used as types.Qualifier in calls to types.TypeString and similar.
-func externalQualifier(p *types.Package) string {
-	// always return the package name, which
-	// should give us things like pkgname.SomeType
-	return p.Name()
-}
-
-func stripPointers(t types.Type, depth int) types.Type {
-	if depth > 10 {
-		return t // TODO: not sure we need depth, but we'll play it safe for now.
-	}
-	depth++
-	u, ok := t.Underlying().(*types.Pointer)
-	if !ok {
-		return t
-	}
-	return stripPointers(u.Elem(), depth)
 }
 
 // namedType returns a *types.Named if the passed in

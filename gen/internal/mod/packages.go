@@ -32,19 +32,11 @@ func (f *Func) GetSignature() *types.Signature {
 
 func (f *Func) TypeString(qualifier types.Qualifier) string {
 	prefix := qualifier(f.TypesFunc.Pkg())
-	if prefix == "" {
+	if prefix == "" || f.GetSignature().Recv() != nil {
 		return f.FuncName
 	}
 
 	return fmt.Sprintf("%s.%s", prefix, f.FuncName)
-}
-
-func (f *Func) Import() string {
-	return fmt.Sprintf(
-		"%s (%s)",
-		f.PkgName,
-		f.PkgPath,
-	)
 }
 
 type Struct struct {

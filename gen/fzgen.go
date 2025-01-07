@@ -187,7 +187,7 @@ func FzgenMain() int {
 		// Do the actual work of emitting our wrappers.
 		var out []byte
 		if !*chainFlag {
-			out, err = emitIndependentWrappers(pkgs[i].PkgPath, pkgs[i], pkgsPatternContent, wrapperPkgName, wrapperOpts)
+			out, err = emitIndependentWrappers(outDir, pkgs[i], pkgsPatternContent, wrapperPkgName, wrapperOpts)
 		} else {
 			out, err = emitChainWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
 		}

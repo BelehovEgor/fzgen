@@ -5,7 +5,12 @@ import "go/types"
 func FindSuitables(s *types.Signature, existedFuncs []*Func) []*Func {
 	var sameFunc []*Func
 	for _, f := range existedFuncs {
-		if compareSignatures(s, f.GetSignature()) {
+		sig := f.GetSignature()
+		if !f.TypesFunc.Exported() || sig.Recv() != nil {
+			continue
+		}
+
+		if compareSignatures(s, sig) {
 			sameFunc = append(sameFunc, f)
 		}
 	}

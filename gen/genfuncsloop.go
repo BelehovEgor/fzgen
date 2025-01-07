@@ -388,7 +388,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 	} else {
 		emit("\ttarget := ")
 	}
-	emitWrappedFunc(emit, f, wrappedSig, "", 0, qualifyAll, inputParams, localPkg)
+	emitWrappedFunc(emit, function, wrappedSig, "", 0, inputParams, localPkg, defaultQualifier)
 	if returnsErr {
 		emit("\tif err != nil {\n")
 		emit("\t\treturn\n")
@@ -541,7 +541,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 	if results.Len() > 0 && !(results.Len() == 1 && results.At(0).Type().String() == "error") {
 		emit("\treturn ")
 	}
-	emitWrappedFunc(emit, f, wrappedSig, "target", 0, qualifyAll, inputParams, localPkg)
+	emitWrappedFunc(emit, function, wrappedSig, "target", 0, inputParams, localPkg, defaultQualifier)
 
 	// close out the func as well as the Step struct
 	emit("\t\t},\n")
@@ -670,3 +670,35 @@ var encodingBinaryMarshalerRoundtripTmpl string = `
 				  target, target, result2, tmp2, tmp2))
 		}
 `
+
+// qualifiers sets up a types.Qualifier func we can use with the types package,
+// paying attention to whether we are qualifying everything or not.
+func qualifiers(localPkg *types.Package, qualifyAll bool) (defaultQualifier, localQualifier types.Qualifier) {
+	localQualifier = func(pkg *types.Package) string {
+		// We call pkg.Path() here because in some cases, such as the Options type from:
+		//    fzgen -func=Close$ -qualifyall=false tailscale.com/logtail/filch
+		// two packages that appear to be equal and have the same internal path field do not
+		// have pointer equality.
+		// The prior problem was the Options type would be emitted as 'filch.Options',
+		// rather than the expected 'Options'. Comparing paths here resolves that.
+		// TODO: understand better why two *Types.packages with same path do not have pointer equality.
+		// TODO: consider using types.RelativeTo, though that also does pointer equality test.
+		if pkg.Path() == localPkg.Path() {
+			return ""
+		}
+		return pkg.Name()
+	}
+	if qualifyAll {
+		defaultQualifier = externalQualifier
+	} else {
+		defaultQualifier = localQualifier
+	}
+	return defaultQualifier, localQualifier
+}
+
+// externalQualifier can be used as types.Qualifier in calls to types.TypeString and similar.
+func externalQualifier(p *types.Package) string {
+	// always return the package name, which
+	// should give us things like pkgname.SomeType
+	return p.Name()
+}
