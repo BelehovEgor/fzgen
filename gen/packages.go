@@ -139,6 +139,8 @@ func getPackageContent(
 	structs := make([]*mod.Struct, 0)
 	interfaces := make([]*mod.Interface, 0)
 
+	hasGenerics := false
+
 	for id, obj := range pkg.TypesInfo.Defs {
 		if pkgDir == "" {
 			pkgDir, err = goListDir(pkg.PkgPath, env)
@@ -153,25 +155,30 @@ func getPackageContent(
 				continue
 			}
 
-			objNamed := obj.Type().(*types.Named)
-			if types.IsInterface(objNamed) {
-				interfaces = append(interfaces, &mod.Interface{
-					InterfaceName:  id.Name,
-					PkgName:        pkg.Name,
-					PkgPath:        pkg.PkgPath,
-					PkgDir:         pkgDir,
-					TypesInterface: objType.Type().Underlying().(*types.Interface),
-					TypesNamed:     objNamed,
-				})
-			} else if structType, ok := objType.Type().Underlying().(*types.Struct); ok {
-				structs = append(structs, &mod.Struct{
-					StructName:  id.Name,
-					PkgName:     pkg.Name,
-					PkgPath:     pkg.PkgPath,
-					PkgDir:      pkgDir,
-					TypesStruct: structType,
-					TypesNamed:  objNamed,
-				})
+			switch t := obj.Type().(type) {
+			case *types.Named:
+				if types.IsInterface(t) {
+					interfaces = append(interfaces, &mod.Interface{
+						InterfaceName:  id.Name,
+						PkgName:        pkg.Name,
+						PkgPath:        pkg.PkgPath,
+						PkgDir:         pkgDir,
+						TypesInterface: objType.Type().Underlying().(*types.Interface),
+						TypesNamed:     t,
+					})
+				} else if structType, ok := objType.Type().Underlying().(*types.Struct); ok {
+					structs = append(structs, &mod.Struct{
+						StructName:  id.Name,
+						PkgName:     pkg.Name,
+						PkgPath:     pkg.PkgPath,
+						PkgDir:      pkgDir,
+						TypesStruct: structType,
+						TypesNamed:  t,
+					})
+				}
+			case *types.TypeParam:
+				// TODO support generics
+				hasGenerics = true
 			}
 		case *types.Func:
 			f := mod.Func{
@@ -186,6 +193,10 @@ func getPackageContent(
 			addTarget(&targets, &f, funcPattern, flags)
 			addConstructor(&constructors, &f, conPattern)
 		}
+	}
+
+	if hasGenerics {
+		fmt.Println("Warning! Generics not supported")
 	}
 
 	return &mod.Package{
@@ -234,7 +245,7 @@ func addTarget(targets *[]*mod.Func, f *mod.Func, funcPattern *regexp.Regexp, fl
 }
 
 func addConstructor(constructors *[]*mod.Func, f *mod.Func, constructorRe *regexp.Regexp) {
-	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) {
+	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) && f.TypesFunc.Exported() {
 		*constructors = append(*constructors, f)
 	}
 }

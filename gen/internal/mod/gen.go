@@ -9,38 +9,6 @@ import (
 
 const maxDepth = 3
 
-func (s *Struct) Initialize(
-	name string,
-	defaultQualifier types.Qualifier,
-	supportedInterfaces map[string]*Interface,
-	existedFuncs []*Func,
-) string {
-	var buffer bytes.Buffer
-	var w io.Writer = &buffer
-	emit := func(format string, args ...interface{}) {
-		fmt.Fprintf(w, format, args...)
-	}
-
-	emit("%s := ", name)
-	emit("\t%s\n", CreateConstructor(s, defaultQualifier))
-
-	return buffer.String()
-}
-
-func (i Interface) GetConstructors(
-	varName string,
-	defaultQualifier types.Qualifier,
-	supportedInterfaces map[string]*Interface,
-	existedFuncs []*Func,
-) []string {
-	constructors := make([]string, len(i.Implementations))
-	for i, imp := range i.Implementations {
-		constructors[i] = imp.Initialize(varName, defaultQualifier, supportedInterfaces, existedFuncs)
-	}
-
-	return constructors
-}
-
 type GeneratedFunc struct {
 	Name, Body  string
 	ArgRequired bool

@@ -16,11 +16,13 @@ import (
 // Each wrapper consists of a target from a constructor and a set of steps that include invoking methods on the target.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
-func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
+func emitChainWrappers(outPkgPath string, pkgFuncs *mod.Package, wrapperPkgName string, options wrapperOptions) ([]byte, error) {
 	possibleConstructors := pkgFuncs.Constructors
 	if len(possibleConstructors) == 0 {
 		return nil, errNoConstructorsMatch
 	}
+
+	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath)
 
 	// Build a map from the receiver type to a set of possible constructors
 	// and possible steps with the same receiver type.
@@ -88,11 +90,11 @@ func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName str
 	emit("package %s\n\n", wrapperPkgName)
 	emit(options.topComment)
 	emit("import (\n")
-	emit("\t\"testing\"\n")
-	if options.qualifyAll {
-		emit("\t\"%s\"\n", pkgPath)
+
+	for _, importStr := range qualifier.GetImportStrings() {
+		emit("\t%s\n", importStr)
 	}
-	emit("\t\"github.com/thepudds/fzgen/fuzzer\"\n")
+
 	emit(")\n\n")
 
 	// Loop over our chains and emit fuzzing wrappers for each one.
@@ -108,7 +110,7 @@ func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName str
 			}
 			continue
 		}
-		err := emitChainWrapper(emit, c.steps, c.constructors, options)
+		err := emitChainWrapper(emit, c.steps, c.constructors, options, qualifier.Qualifier)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -126,7 +128,13 @@ func emitChainWrappers(pkgPath string, pkgFuncs *mod.Package, wrapperPkgName str
 // emitChainWrapper emits one fuzzing wrapper where possible for the list of functions passed in.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
 // type such as interface{}.
-func emitChainWrapper(emit emitFunc, functions []mod.Func, possibleConstructors []mod.Func, options wrapperOptions) error {
+func emitChainWrapper(
+	emit emitFunc,
+	functions []mod.Func,
+	possibleConstructors []mod.Func,
+	options wrapperOptions,
+	qualifier types.Qualifier,
+) error {
 	if len(functions) == 0 {
 		return errors.New("emitChainWrapper: zero functions")
 	}
@@ -142,7 +150,7 @@ func emitChainWrapper(emit emitFunc, functions []mod.Func, possibleConstructors 
 
 	// use the first constructor
 	ctor := possibleConstructors[0]
-	err := emitChainTarget(emit, ctor, options.qualifyAll)
+	err := emitChainTarget(emit, ctor, qualifier)
 	if err != nil {
 		return fmt.Errorf("unable to create chain target for constructor %s: %w", ctor.FuncName, err)
 	}
@@ -161,7 +169,7 @@ func emitChainWrapper(emit emitFunc, functions []mod.Func, possibleConstructors 
 	// loop over our the functions we are wrapping, emitting a wrapper where possible.
 	var emittedSteps int
 	for _, function := range functions {
-		err := emitChainStep(emit, function, ctor, options.qualifyAll)
+		err := emitChainStep(emit, function, ctor, qualifier)
 		if errors.Is(err, errSilentSkip) {
 			continue
 		}
@@ -273,18 +281,13 @@ func emitChainWrapper(emit emitFunc, functions []mod.Func, possibleConstructors 
 	return nil
 }
 
-func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
+func emitChainTarget(emit emitFunc, function mod.Func, qualifier types.Qualifier) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
 		return fmt.Errorf("function %s is not *types.Signature (%+v)", function, f)
 	}
 	localPkg := f.Pkg()
-
-	// Set up types.Qualifier funcs we can use with the types package
-	// to scope variables by a package or not.
-	defaultQualifier, localQualifier := qualifiers(localPkg, qualifyAll)
-
 	// Get our receiver, which might be nil if we don't have a receiver
 	recv := wrappedSig.Recv()
 
@@ -299,7 +302,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 			fmt.Fprintf(os.Stderr, "fzgen: warning: createWrapper: failed to determine receiver type: %v: %v\n", recv, err)
 			return nil
 		}
-		recvNamedTypeLocalName := types.TypeString(n.Obj().Type(), localQualifier)
+		recvNamedTypeLocalName := types.TypeString(n.Obj().Type(), qualifier)
 		wrapperName = fmt.Sprintf("Fuzz_%s_%s", recvNamedTypeLocalName, f.Name())
 	}
 
@@ -315,7 +318,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 
 	paramReprs := make([]paramRepr, len(inputParams))
 	for i, v := range inputParams {
-		typeStringWithSelector := types.TypeString(v.Type(), defaultQualifier)
+		typeStringWithSelector := types.TypeString(v.Type(), qualifier)
 		paramName := avoidCollision(v, i, localPkg, inputParams)
 		paramReprs[i] = paramRepr{paramName: paramName, typ: typeStringWithSelector, v: v}
 	}
@@ -388,7 +391,7 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 	} else {
 		emit("\ttarget := ")
 	}
-	emitWrappedFunc(emit, function, wrappedSig, "", 0, inputParams, localPkg, defaultQualifier)
+	emitWrappedFunc(emit, function, wrappedSig, "", 0, inputParams, localPkg, qualifier)
 	if returnsErr {
 		emit("\tif err != nil {\n")
 		emit("\t\treturn\n")
@@ -402,17 +405,18 @@ func emitChainTarget(emit emitFunc, function mod.Func, qualifyAll bool) error {
 // It takes a list of possible constructors to insert into the step body if the
 // constructor is suitable for creating the receiver of a wrapped method.
 // qualifyAll indicates if all variables should be qualified with their package.
-func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, qualifyAll bool) error {
+func emitChainStep(
+	emit emitFunc,
+	function mod.Func,
+	constructor mod.Func,
+	qualifier types.Qualifier,
+) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
 		return fmt.Errorf("function %s is not *types.Signature (%+v)", function, f)
 	}
 	localPkg := f.Pkg()
-
-	// Set up types.Qualifier funcs we can use with the types package
-	// to scope variables by a package or not.
-	defaultQualifier, localQualifier := qualifiers(localPkg, qualifyAll)
 
 	// Get our receiver, which might be nil if we don't have a receiver
 	recv := wrappedSig.Recv()
@@ -442,7 +446,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 			return errSilentSkip
 		}
 
-		recvNamedTypeLocalName := types.TypeString(n.Obj().Type(), localQualifier)
+		recvNamedTypeLocalName := types.TypeString(n.Obj().Type(), qualifier)
 		wrapperName = fmt.Sprintf("Fuzz_%s_%s", recvNamedTypeLocalName, f.Name())
 	}
 
@@ -460,7 +464,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 
 	paramReprs := make([]paramRepr, len(inputParams))
 	for i, v := range inputParams {
-		typeStringWithSelector := types.TypeString(v.Type(), defaultQualifier)
+		typeStringWithSelector := types.TypeString(v.Type(), qualifier)
 		paramName := avoidCollision(v, i, localPkg, inputParams)
 		paramReprs[i] = paramRepr{paramName: paramName, typ: typeStringWithSelector, v: v}
 	}
@@ -518,7 +522,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 				if i > 0 {
 					emit(", ")
 				}
-				returnTypeStringWithSelector := types.TypeString(results.At(i).Type(), defaultQualifier)
+				returnTypeStringWithSelector := types.TypeString(results.At(i).Type(), qualifier)
 				emit(returnTypeStringWithSelector)
 			}
 			emit(")")
@@ -541,7 +545,7 @@ func emitChainStep(emit emitFunc, function mod.Func, constructor mod.Func, quali
 	if results.Len() > 0 && !(results.Len() == 1 && results.At(0).Type().String() == "error") {
 		emit("\treturn ")
 	}
-	emitWrappedFunc(emit, function, wrappedSig, "target", 0, inputParams, localPkg, defaultQualifier)
+	emitWrappedFunc(emit, function, wrappedSig, "target", 0, inputParams, localPkg, qualifier)
 
 	// close out the func as well as the Step struct
 	emit("\t\t},\n")

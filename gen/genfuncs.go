@@ -62,7 +62,6 @@ func emitIndependentWrappers(
 	})
 
 	supportedInterfaces := pkgsPatternContent.GetSupportedInterfaces()
-	supportedStructs := pkgsPatternContent.GetSupportedStructs()
 	existedFuncs := pkgsPatternContent.Funcs
 
 	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath)
@@ -102,7 +101,7 @@ func emitIndependentWrappers(
 		}
 
 		err := emitIndependentWrapper(
-			emit, *function, constructors, supportedInterfaces, supportedStructs, existedFuncs, qualifier.Qualifier)
+			emit, *function, constructors, supportedInterfaces, existedFuncs, qualifier.Qualifier)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -135,7 +134,6 @@ func emitIndependentWrapper(
 	function mod.Func,
 	constructors []mod.Func,
 	supportedInterfaces map[string]*mod.Interface,
-	supportedStructs map[string]*mod.Struct,
 	existedFuncs []*mod.Func,
 	qualifier types.Qualifier) error {
 	f := function.TypesFunc
@@ -257,40 +255,23 @@ func emitIndependentWrapper(
 		// First, finish the line we are on.
 		emit("data []byte) {\n")
 		// Second, declare the variables we need to fill.
-		fillParams := make([]paramRepr, 0)
 		for _, p := range paramReprs {
-			if pkgInterface, ok := supportedInterfaces[p.v.Type().String()]; ok {
-				initLines := pkgInterface.GetConstructors(p.paramName, qualifier, supportedInterfaces, existedFuncs)
-				emit(initLines[0])
-				fillParams = append(fillParams, p)
-			} else if pkgStruct, ok := supportedStructs[p.v.Type().String()]; ok && mod.HasNotNative(pkgStruct) {
-				initLines := pkgStruct.Initialize(p.paramName, qualifier, supportedInterfaces, existedFuncs)
-				emit(initLines)
-				fillParams = append(fillParams, p)
-			} else if signature, ok := p.v.Type().Underlying().(*types.Signature); ok {
-				suitables := mod.FindSuitables(signature, existedFuncs)
-				emit("\t\tvar %s %s = %s\n", p.paramName, p.typ, suitables[0].TypeString(qualifier))
-			} else {
-				emit("\t\tvar %s %s\n", p.paramName, p.typ)
-				fillParams = append(fillParams, p)
-			}
+			emit("\t\tvar %s %s\n", p.paramName, p.typ)
 		}
 
-		if len(fillParams) > 0 {
-			// Third, create a fzgen.Fuzzer
-			emit("\t\tfz := fuzzer.NewFuzzer(data)\n")
-			// Fourth, emit a potentially wide Fill call for all the variables we declared.
-			emit("\t\tfz.Fill(")
-			for i, p := range fillParams {
-				if i > 0 {
-					emit(", ")
-				}
-				emit("&%s", p.paramName)
+		// Third, create a fzgen.Fuzzer
+		emit("\t\tfz := fuzzer.NewFuzzer(data)\n")
+		// Fourth, emit a potentially wide Fill call for all the variables we declared.
+		emit("\t\tfz.Fill(")
+		for i, p := range paramReprs {
+			if i > 0 {
+				emit(", ")
 			}
-			emit(")\n")
-			// Avoid nil crash if we have pointer parameters.
-			emitNilChecks(emit, inputParams, localPkg)
+			emit("&%s", p.paramName)
 		}
+		emit(")\n")
+		// Avoid nil crash if we have pointer parameters.
+		emitNilChecks(emit, inputParams, localPkg)
 
 		emit("\n")
 	default:

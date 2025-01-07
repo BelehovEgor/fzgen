@@ -189,7 +189,7 @@ func FzgenMain() int {
 		if !*chainFlag {
 			out, err = emitIndependentWrappers(outDir, pkgs[i], pkgsPatternContent, wrapperPkgName, wrapperOpts)
 		} else {
-			out, err = emitChainWrappers(pkgs[i].PkgPath, pkgs[i], wrapperPkgName, wrapperOpts)
+			out, err = emitChainWrappers(outDir, pkgs[i], wrapperPkgName, wrapperOpts)
 		}
 		// Handle certain common errors gracefully, including skipping & continuing if multiple target packages.
 		msgDest, msgPrefix := os.Stderr, "fzgen:"
