@@ -74,7 +74,7 @@ func emitIndependentWrappers(
 	}
 
 	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
-	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, qualifier.Qualifier)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, qualifier)
 	init := mod.GenerateInitTestFunc(fabrics, constructors, qualifier.Qualifier)
 
 	// emit the intro material
@@ -272,7 +272,7 @@ func emitIndependentWrapper(
 		}
 
 		// Third, create a fzgen.Fuzzer
-		emit("\t\tfz := fuzzer.NewFuzzer(data)\n")
+		emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)\n")
 		// Fourth, emit a potentially wide Fill call for all the variables we declared.
 		emit("\t\tfz.Fill(")
 		for i, p := range paramReprs {

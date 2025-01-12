@@ -2,7 +2,8 @@
 //
 // The primary use case is to allow thepudds/fzgen to automatically generate fuzzing functions
 // for rich signatures such as:
-//    regexp.MatchReader(pattern string, r io.RuneReader)
+//
+//	regexp.MatchReader(pattern string, r io.RuneReader)
 //
 // randparam fills in common top-level interfaces such as io.Reader, io.Writer, io.ReadWriter, and so on.
 // See SupportedInterfaces for current list.
@@ -47,7 +48,11 @@ var SupportedInterfaces = map[string]bool{
 // It allows wiring together cmd/go fuzzing or dvyukov/go-fuzz (for randomness, instrumentation, managing corpus, etc.)
 // with the ability to fill in common interfaces, as well as string, []byte, and number values.
 type Fuzzer struct {
-	fzgoSrc *randSource
+	fzgoSrc       *randSource
+	typeFabricMap map[string][]reflect.Value
+
+	// tech
+	used map[reflect.Value]bool
 }
 
 // NewFuzzer returns a *Fuzzer, initialized with the []byte as an input stream for drawing values via rand.Rand.
@@ -81,6 +86,19 @@ func NewFuzzer(data []byte) *Fuzzer {
 	return f
 }
 
+func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value) *Fuzzer {
+	fzgoSrc := &randSource{data}
+
+	f := &Fuzzer{
+		fzgoSrc:       fzgoSrc,
+		typeFabricMap: typeFabricMap,
+	}
+
+	fzgoSrc.Byte()
+
+	return f
+}
+
 // Remaining reports how many bytes remain in our original input []byte.
 func (f *Fuzzer) Remaining() int {
 	return f.fzgoSrc.Remaining()
@@ -104,30 +122,31 @@ func (f *Fuzzer) Data() []byte {
 // Note: keep in sync with SupportedInterfaces (TODO: consider making dynamic).
 //
 // Rough counts of most common interfaces in public funcs/methods For stdlib
-//   (based on output from early version of fzgo that skipped all interfaces):
-//   $ grep -r 'skipping' | awk '{print $10}'  | grep -v 'func' | sort | uniq -c | sort -rn | head -20
-// 		146 io.Writer
-// 		122 io.Reader
-// 		 75 reflect.Type
-// 		 64 go/types.Type
-// 		 55 interface{}
-// 		 44 context.Context
-// 		 41 []interface{}
-// 		 22 go/constant.Value
-// 		 17 net.Conn
-// 		 17 math/rand.Source
-// 		 16 net/http.ResponseWriter
-// 		 16 net/http.Handler
-// 		 16 image/color.Color
-// 		 13 io.ReadWriteCloser
-// 		 13 error
-// 		 12 image/color.Palette
-// 		 11 io.ReaderAt
-// 		  9 crypto/cipher.Block
-// 		  8 net.Listener
-// 		  6 go/ast.Node
 //
-func (f *Fuzzer) fillInterface(obj interface{}) bool {
+//	  (based on output from early version of fzgo that skipped all interfaces):
+//	  $ grep -r 'skipping' | awk '{print $10}'  | grep -v 'func' | sort | uniq -c | sort -rn | head -20
+//			146 io.Writer
+//			122 io.Reader
+//			 75 reflect.Type
+//			 64 go/types.Type
+//			 55 interface{}
+//			 44 context.Context
+//			 41 []interface{}
+//			 22 go/constant.Value
+//			 17 net.Conn
+//			 17 math/rand.Source
+//			 16 net/http.ResponseWriter
+//			 16 net/http.Handler
+//			 16 image/color.Color
+//			 13 io.ReadWriteCloser
+//			 13 error
+//			 12 image/color.Palette
+//			 11 io.ReaderAt
+//			  9 crypto/cipher.Block
+//			  8 net.Listener
+//			  6 go/ast.Node
+func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) bool {
+	obj := reflectValue.Addr().Interface()
 	var b []byte
 	switch v := obj.(type) {
 	// Cases using bytes.NewReader
@@ -187,8 +206,105 @@ func (f *Fuzzer) fillInterface(obj interface{}) bool {
 
 	// No match
 	default:
+		return f.fillCustomInterface(reflectValue, 0, opts)
+	}
+	return true
+}
+
+func (f *Fuzzer) fillCustomInterface(reflectValue reflect.Value, depth int, opts fillOpts) bool {
+	if f.typeFabricMap == nil {
 		return false
 	}
+
+	isFirstInterfaceInStack := false
+	if f.used == nil {
+		isFirstInterfaceInStack = true
+		f.used = make(map[reflect.Value]bool)
+	}
+
+	typeName := reflectValue.Type().String()
+	fabrics, has := f.typeFabricMap[typeName]
+
+	var unusedFabrics []reflect.Value
+	for _, fab := range fabrics {
+		if !f.used[fab] {
+			unusedFabrics = append(unusedFabrics, fab)
+		}
+	}
+
+	if !has || len(unusedFabrics) == 0 {
+		if isFirstInterfaceInStack {
+			f.used = nil
+		}
+
+		return true // nil
+	}
+	countUnused := int8(len(unusedFabrics))
+
+	// chouse specific fabric
+	var numberOfFabric int8
+	f.Fill(&numberOfFabric)
+	fn := unusedFabrics[numberOfFabric%countUnused]
+	f.used[fn] = true
+	fnType := fn.Type()
+
+	args := make([]reflect.Value, fnType.NumIn())
+	for i := 0; i < fnType.NumIn(); i++ {
+		inParamType := fnType.In(i)
+		inParamValue := reflect.New(inParamType).Elem()
+
+		f.fill(inParamValue, depth+1, opts)
+		args[i] = inParamValue
+	}
+
+	res := fn.Call(args)
+	// now here constructors without error in result tuple
+	if len(res) == 1 {
+		reflectValue.Set(res[0])
+	}
+
+	if isFirstInterfaceInStack {
+		f.used = nil
+	}
+
+	return true
+}
+
+func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
+	if f.typeFabricMap == nil {
+		return false
+	}
+
+	typeName := reflectValue.Type().String()
+	fabrics, has := f.typeFabricMap[typeName]
+	if !has || len(fabrics) == 0 {
+		return false
+	}
+
+	//count := int8(len(fabrics))
+
+	// chouse specific fabric
+	var numberOfFabric int8
+	f.Fill(&numberOfFabric)
+	fn := fabrics[0]
+	fnType := fn.Type()
+
+	args := make([]reflect.Value, fnType.NumIn())
+	for i := 0; i < fnType.NumIn(); i++ {
+		inParamType := fnType.In(i)
+		inParamValue := reflect.New(inParamType).Elem()
+
+		// only int now
+		f.Fill(inParamValue)
+		args[i] = inParamValue
+	}
+
+	res := fn.Call(args)
+	// now here constructors without error in result tuple
+	if len(res) == 1 {
+		reflectValue.Set(res[0])
+	}
+
 	return true
 }
 
@@ -248,10 +364,10 @@ func (f *Fuzzer) fillInterface(obj interface{}) bool {
 // something when we find a 0x0 in the spot where a length field would go.
 //
 // Summary: one way to think about it is the encoding of a length field is:
-//      * 0-N 0x0 bytes prior to a non-zero byte, and
-//      * that non-zero byte is the actual length used, unless that non-zero byte
-//	      is 0xFF, in which case that signals a zero-length string/[]byte, and
-//      * the length value used must be able to draw enough real random bytes from the input []byte.
+//   - 0-N 0x0 bytes prior to a non-zero byte, and
+//   - that non-zero byte is the actual length used, unless that non-zero byte
+//     is 0xFF, in which case that signals a zero-length string/[]byte, and
+//   - the length value used must be able to draw enough real random bytes from the input []byte.
 func (f *Fuzzer) fillByteSlice(ptr *[]byte) {
 	verbose := false // TODO: probably remove eventually.
 	if verbose {
@@ -577,10 +693,7 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
 			}
 		}
 	case reflect.Interface:
-		// get back the &interface{}.
-		iface := v.Addr().Interface()
-		// see if we can fill it.
-		success := f.fillInterface(iface)
+		success := f.fillInterface(v, opts)
 		if !success && opts.panicOnUnsupported {
 			panic(fmt.Sprintf("fzgen: fill: unsupported interface kind %v for value %v of type %v", v.Kind(), v, v.Type()))
 		}
@@ -588,7 +701,12 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
 		// create a zero value elem, then recursively fill that
 		v.Set(reflect.New(v.Type().Elem()))
 		f.fill(v.Elem(), depth, opts)
-	case reflect.Uintptr, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+	case reflect.Func:
+		success := f.fillFunc(v)
+		if !success && opts.panicOnUnsupported {
+			panic(fmt.Sprintf("fzgen: fill: unsupported func kind %v for value %v of type %v", v.Kind(), v, v.Type()))
+		}
+	case reflect.Uintptr, reflect.Chan, reflect.UnsafePointer:
 		if opts.panicOnUnsupported {
 			panic(fmt.Sprintf("fzgen: fill: unsupported kind %v for value %v of type %v", v.Kind(), v, v.Type()))
 		}

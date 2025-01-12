@@ -173,7 +173,7 @@ func (iq *ImportQualifier) Qualifier(p *types.Package) string {
 }
 
 type VariablesContext struct {
-	importQualifier ImportQualifier
+	importQualifier *ImportQualifier
 
 	varNames map[string]int
 
@@ -181,10 +181,11 @@ type VariablesContext struct {
 	Fabrics      map[types.Type]*GeneratedFunc
 }
 
-func CreateVariablesContext(importQualifier ImportQualifier) *VariablesContext {
+func CreateVariablesContext(importQualifier *ImportQualifier) *VariablesContext {
 	return &VariablesContext{
 		importQualifier: importQualifier,
 		uniqueNumber:    1,
+		varNames:        make(map[string]int),
 	}
 }
 

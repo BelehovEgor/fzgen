@@ -26,7 +26,7 @@ func CreateConstructor(s *Struct, defaultQualifier types.Qualifier) string {
 
 func CreateFabricOfInterfaces(
 	pkgInterface *Interface,
-	qualifier types.Qualifier,
+	qualifier *ImportQualifier,
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
 ) *GeneratedFunc {
@@ -40,34 +40,58 @@ func CreateFabricOfInterfaces(
 		fmt.Fprintf(w, format, args...)
 	}
 
+	varContext := CreateVariablesContext(qualifier)
 	funcName := "fabric_interface_" + pkgInterface.PkgName + pkgInterface.InterfaceName
-	interfaceTypeString := pkgInterface.TypeString(qualifier)
-	if len(pkgInterface.Implementations) == 1 {
-		emit("func %s() %s {\n", funcName, interfaceTypeString)
-		emit("\treturn %s\n}\n", CreateConstructor(pkgInterface.Implementations[0], qualifier))
-	} else {
-		emit("func %s(num int) %s {\n", funcName, interfaceTypeString)
+	interfaceTypeString := pkgInterface.TypeString(qualifier.Qualifier)
+
+	if len(pkgInterface.Implementations) > 1 {
+		var argNames []string
+		emit("func %s(\n\tnum int,\n", funcName)
+		for _, s := range pkgInterface.Implementations {
+			name := varContext.CreateUniqueName("impl")
+			argNames = append(argNames, name)
+			typeString := s.TypeString(qualifier.Qualifier)
+			if s.AsPointer {
+				emit("\t%s *%s,\n", name, typeString)
+			} else {
+				emit("\t%s %s,\n", name, typeString)
+			}
+		}
+
+		emit(") %s {\n", interfaceTypeString)
+
 		emit("\tswitch num %s %d {\n", "%", len(pkgInterface.Implementations))
-		for i, s := range pkgInterface.Implementations {
-			emit("\tcase %d:\n", i)
-			emit("\t\treturn %s\n", CreateConstructor(s, qualifier))
+		for i, s := range argNames {
+			emit("\t\tcase %d:\n", i)
+			emit("\t\t\treturn %s\n", s)
 		}
 		emit("\tdefault:\n")
 		emit("\t\tpanic(\"unreachable\")\n\t}\n}\n")
+	} else {
+		emit("func %s(impl ", funcName)
+		typeString := pkgInterface.Implementations[0].TypeString(qualifier.Qualifier)
+		if pkgInterface.Implementations[0].AsPointer {
+			emit("*%s) ", typeString)
+		} else {
+			emit("%s) ", typeString)
+		}
+		emit("%s {\n", interfaceTypeString)
+		emit("\treturn impl")
+		emit("}\n")
 	}
 
 	return &GeneratedFunc{
 		Name:        funcName,
 		Body:        buf.String(),
 		ArgRequired: len(pkgInterface.Implementations) > 1,
-		ReturnType:  pkgInterface.TypeString(qualifier),
+		ReturnType:  pkgInterface.TypeString(qualifier.Qualifier),
 	}
 }
 
 func CreateFabricOfFuncs(
 	signature *types.Signature,
 	prefix string,
-	qualifier types.Qualifier,
+	qualifier *ImportQualifier,
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
 ) *GeneratedFunc {
@@ -83,16 +107,16 @@ func CreateFabricOfFuncs(
 	}
 
 	funcName := "fabric_func_" + prefix
-	typeString := types.TypeString(signature, qualifier)
+	typeString := types.TypeString(signature, qualifier.Qualifier)
 	if len(suitable) == 1 {
 		emit("func %s() %s {\n", funcName, typeString)
-		emit("\treturn %s\n}\n", suitable[0].TypeString(qualifier))
+		emit("\treturn %s\n}\n", suitable[0].TypeString(qualifier.Qualifier))
 	} else {
 		emit("func %s(num int) %s {\n", funcName, typeString)
 		emit("\tswitch num %s %d {\n", "%", len(suitable))
 		for i, s := range suitable {
 			emit("\tcase %d:\n", i)
-			emit("\t\treturn %s\n", s.TypeString(qualifier))
+			emit("\t\treturn %s\n", s.TypeString(qualifier.Qualifier))
 		}
 		emit("\tdefault:\n")
 		emit("\t\tpanic(\"unreachable\")\n\t}\n}\n")
@@ -102,7 +126,7 @@ func CreateFabricOfFuncs(
 		Name:        funcName,
 		Body:        buf.String(),
 		ArgRequired: len(suitable) > 1,
-		ReturnType:  types.TypeString(signature, qualifier),
+		ReturnType:  types.TypeString(signature, qualifier.Qualifier),
 	}
 }
 
@@ -110,15 +134,15 @@ func GenerateFabrics(
 	targets []*Func,
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
-	defaultQualifier types.Qualifier,
-) map[types.Type]*GeneratedFunc {
-	generated := make(map[types.Type]*GeneratedFunc)
+	qualifier *ImportQualifier,
+) map[string]*GeneratedFunc {
+	generated := make(map[string]*GeneratedFunc)
 	for i, target := range targets {
 		for j, param := range GetInputParams(target) {
 			switch u := param.Type().Underlying().(type) {
 			case *types.Interface:
-				if f := createFabricOfInterfaces(param, defaultQualifier, supportedInterfaces, existedFuncs); f != nil {
-					generated[u] = f
+				if f := createFabricOfInterfaces(param, qualifier, supportedInterfaces, existedFuncs); f != nil {
+					generated[types.TypeString(u, qualifier.Qualifier)] = f
 				}
 			case *types.Struct:
 				for notNativeType := range getNotNativeTypes(u, 1) {
@@ -126,21 +150,21 @@ func GenerateFabrics(
 					case *types.Interface:
 						if f := createFabricOfInterfaces(
 							notNativeType,
-							defaultQualifier,
+							qualifier,
 							supportedInterfaces,
 							existedFuncs,
 						); f != nil {
-							generated[t] = f
+							generated[types.TypeString(t, qualifier.Qualifier)] = f
 						}
 					case *types.Signature:
 						if f := CreateFabricOfFuncs(
 							t,
 							fmt.Sprintf("%d_%d", i, j),
-							defaultQualifier,
+							qualifier,
 							supportedInterfaces,
 							existedFuncs,
 						); f != nil {
-							generated[t] = f
+							generated[types.TypeString(t, qualifier.Qualifier)] = f
 						}
 					}
 				}
@@ -148,11 +172,11 @@ func GenerateFabrics(
 				if f := CreateFabricOfFuncs(
 					u,
 					fmt.Sprintf("%d_%d", i, j),
-					defaultQualifier,
+					qualifier,
 					supportedInterfaces,
 					existedFuncs,
 				); f != nil {
-					generated[u] = f
+					generated[types.TypeString(u, qualifier.Qualifier)] = f
 				}
 			}
 		}
@@ -163,7 +187,7 @@ func GenerateFabrics(
 
 func createFabricOfInterfaces(
 	v *types.Var,
-	defaultQualifier types.Qualifier,
+	qualifier *ImportQualifier,
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
 ) *GeneratedFunc {
@@ -172,11 +196,11 @@ func createFabricOfInterfaces(
 	if !ok {
 		return nil
 	}
-	return CreateFabricOfInterfaces(supported, defaultQualifier, supportedInterfaces, existedFuncs)
+	return CreateFabricOfInterfaces(supported, qualifier, supportedInterfaces, existedFuncs)
 }
 
 func GenerateInitTestFunc(
-	generatedFuncs map[types.Type]*GeneratedFunc,
+	generatedFuncs map[string]*GeneratedFunc,
 	constructors []*Func,
 	qualifier types.Qualifier,
 ) *GeneratedFunc {

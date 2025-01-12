@@ -7,7 +7,8 @@
 // be used to automatically create wrappers that use package fuzzer.
 //
 // See the project README for additional information:
-//     https://github.com/thepudds/fzgen
+//
+//	https://github.com/thepudds/fzgen
 package fuzzer
 
 import (
@@ -71,16 +72,31 @@ func NewFuzzer(data []byte, options ...FuzzerOpt) (fz *Fuzzer) {
 	}
 }
 
+func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, options ...FuzzerOpt) (fz *Fuzzer) {
+	fill := randparam.NewFuzzerV2(data, typeFabricMap)
+	state := &execState{
+		reusableInputs: make(map[reflect.Type][]*reflect.Value),
+		outputSlots:    make(map[reflect.Type][]*outputSlot),
+	}
+	return &Fuzzer{
+		data:            data,
+		randparamFuzzer: fill,
+		execState:       state,
+	}
+}
+
 // Fill fills in most simple types, maps, slices, arrays, and recursively fills any public members of x.
 // It supports about 20 or so common interfaces, such as io.Reader, io.Writer, or io.ReadWriter.
 // See SupportedInterfaces for current list of supported interfaces.
 // Callers pass in a pointer to the object to fill, such as:
-//    var i int
-//    Fill(&i)
-//    var r io.Reader
-//    Fill(&r)
-//    var s1, s2 string
-//    Fill(&s1, &s2)
+//
+//	var i int
+//	Fill(&i)
+//	var r io.Reader
+//	Fill(&r)
+//	var s1, s2 string
+//	Fill(&s1, &s2)
+//
 // Fill ignores channels, func pointers, complex64, complex128, and uintptr,
 // For number, string, and []byte types, it tries to populate the obj value with literals found in the initial input []byte.
 //
@@ -88,6 +104,20 @@ func NewFuzzer(data []byte, options ...FuzzerOpt) (fz *Fuzzer) {
 // Fill must not be called from within the Steps used with Chain. If you need additional values within a Step, add
 // them as parameters to the Step, and Chain will fill those parameters.
 func (fz *Fuzzer) Fill(x ...interface{}) {
+	// TODO: probably panic if called from within Chain.
+	for _, arg := range x {
+		before := fz.randparamFuzzer.Remaining()
+
+		fz.randparamFuzzer.Fill(arg)
+
+		if debugPrintPlan {
+			fmt.Printf("fzgen: filled object of type \"%T\" using %d bytes. %d bytes remaining.\n",
+				arg, before-fz.randparamFuzzer.Remaining(), fz.randparamFuzzer.Remaining())
+		}
+	}
+}
+
+func (fz *Fuzzer) FillWithFabrics(typeFabricMap map[string][]reflect.Value, x ...interface{}) {
 	// TODO: probably panic if called from within Chain.
 	for _, arg := range x {
 		before := fz.randparamFuzzer.Remaining()
@@ -722,16 +752,16 @@ func emitPlan(pl plan.Plan) {
 //
 // Output:
 //
-//     Fuzz_MySafeMap_Load(
-//             [4]uint8{0,0,0,0},
-//     )
-//     __fzCall2Retval1 := Fuzz_MySafeMap_Load(
-//             [4]uint8{0,0,0,0},
-//     )
-//     Fuzz_MySafeMap_Store(
-//             [4]uint8{0,0,0,0},
-//             __fzCall2Retval1,
-//     )
+//	Fuzz_MySafeMap_Load(
+//	        [4]uint8{0,0,0,0},
+//	)
+//	__fzCall2Retval1 := Fuzz_MySafeMap_Load(
+//	        [4]uint8{0,0,0,0},
+//	)
+//	Fuzz_MySafeMap_Store(
+//	        [4]uint8{0,0,0,0},
+//	        __fzCall2Retval1,
+//	)
 func emitBasicRepro(calls []execCall, sequential bool, startParallelIndex int, stopParallelIndex int) {
 	litter.Config.Compact = true
 	// TODO: Probably use litter.Options object
