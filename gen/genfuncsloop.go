@@ -242,13 +242,8 @@ func emitChainWrapper(
 	if doBinaryRoundtrip || doTextRoundtrip {
 		emit("\n// Validate with some roundtrip checks. These can be edited or deleted if not appropriate for your target.")
 
-		// Set up a qualifier so that we handle a local package vs. not for the temp variables
-		// for our target.
-		// TODO: make utility func, probably.
-		localPkg := ctor.TypesFunc.Pkg()
 		// Set up types.Qualifier funcs we can use with the types package
 		// to scope variables by a package or not.
-		defaultQualifier, _ := qualifiers(localPkg, options.qualifyAll)
 		ctorType := ctor.TypesFunc.Type()
 		ctorSig, ok := ctorType.(*types.Signature)
 		if !ok {
@@ -263,7 +258,7 @@ func emitChainWrapper(
 			doTextRoundtrip = false
 		}
 		ctorResult := ctorResults.At(0)
-		ctorTypeStringWithSelector = types.TypeString(ctorResult.Type(), defaultQualifier)
+		ctorTypeStringWithSelector = types.TypeString(ctorResult.Type(), qualifier)
 	}
 	if doTextRoundtrip {
 		emit(encodingTextMarshalerRoundtripTmpl, ctorTypeStringWithSelector)
@@ -674,35 +669,3 @@ var encodingBinaryMarshalerRoundtripTmpl string = `
 				  target, target, result2, tmp2, tmp2))
 		}
 `
-
-// qualifiers sets up a types.Qualifier func we can use with the types package,
-// paying attention to whether we are qualifying everything or not.
-func qualifiers(localPkg *types.Package, qualifyAll bool) (defaultQualifier, localQualifier types.Qualifier) {
-	localQualifier = func(pkg *types.Package) string {
-		// We call pkg.Path() here because in some cases, such as the Options type from:
-		//    fzgen -func=Close$ -qualifyall=false tailscale.com/logtail/filch
-		// two packages that appear to be equal and have the same internal path field do not
-		// have pointer equality.
-		// The prior problem was the Options type would be emitted as 'filch.Options',
-		// rather than the expected 'Options'. Comparing paths here resolves that.
-		// TODO: understand better why two *Types.packages with same path do not have pointer equality.
-		// TODO: consider using types.RelativeTo, though that also does pointer equality test.
-		if pkg.Path() == localPkg.Path() {
-			return ""
-		}
-		return pkg.Name()
-	}
-	if qualifyAll {
-		defaultQualifier = externalQualifier
-	} else {
-		defaultQualifier = localQualifier
-	}
-	return defaultQualifier, localQualifier
-}
-
-// externalQualifier can be used as types.Qualifier in calls to types.TypeString and similar.
-func externalQualifier(p *types.Package) string {
-	// always return the package name, which
-	// should give us things like pkgname.SomeType
-	return p.Name()
-}
