@@ -89,12 +89,6 @@ func emitIndependentWrappers(
 
 	emit(")\n\n")
 
-	for _, value := range fabrics {
-		emit("%s\n", value.Body)
-	}
-
-	emit("%s\n\n", init.Body)
-
 	// Loop over our the functions we are wrapping, emitting a wrapper where possible.
 	// We only return an error if all fail.
 	var firstErr error
@@ -125,6 +119,12 @@ func emitIndependentWrappers(
 	if !success {
 		return nil, firstErr
 	}
+
+	for _, value := range fabrics {
+		emit("%s\n", value.Body)
+	}
+
+	emit("%s\n\n", init.Body)
 
 	return buf.Bytes(), nil
 }
