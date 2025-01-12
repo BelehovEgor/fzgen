@@ -22,7 +22,7 @@ func emitChainWrappers(outPkgPath string, pkgFuncs *mod.Package, wrapperPkgName 
 		return nil, errNoConstructorsMatch
 	}
 
-	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath)
+	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
 
 	// Build a map from the receiver type to a set of possible constructors
 	// and possible steps with the same receiver type.

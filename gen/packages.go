@@ -244,7 +244,11 @@ func addTarget(targets *[]*mod.Func, f *mod.Func, funcPattern *regexp.Regexp, fl
 	return nil
 }
 
-func addConstructor(constructors *[]*mod.Func, f *mod.Func, constructorRe *regexp.Regexp) {
+func addConstructor(
+	constructors *[]*mod.Func,
+	f *mod.Func,
+	constructorRe *regexp.Regexp,
+) {
 	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) && f.TypesFunc.Exported() {
 		*constructors = append(*constructors, f)
 	}

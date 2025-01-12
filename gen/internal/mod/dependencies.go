@@ -75,17 +75,19 @@ func hasNotNative(s *types.Struct, depth int) bool {
 
 type ImportQualifier struct {
 	pkgName, pkgPath, outPkgPath, outPkgName string
+	isLocalTest                              bool
 
 	Imports     map[string]string
 	importNames map[string]int
 }
 
-func CreateQualifier(pkgName, pkgPath, outPkgName, outPkgPath string) *ImportQualifier {
+func CreateQualifier(pkgName, pkgPath, outPkgName, outPkgPath string, isLocalTest bool) *ImportQualifier {
 	q := &ImportQualifier{
 		pkgName:     pkgName,
 		pkgPath:     pkgPath,
 		outPkgPath:  outPkgPath,
 		outPkgName:  outPkgName,
+		isLocalTest: isLocalTest,
 		Imports:     make(map[string]string),
 		importNames: make(map[string]int),
 	}
@@ -93,7 +95,10 @@ func CreateQualifier(pkgName, pkgPath, outPkgName, outPkgPath string) *ImportQua
 	q.Imports[outPkgPath] = ""
 	q.importNames[outPkgName] = 0
 
-	if pkgPath != outPkgPath {
+	if isLocalTest {
+		q.Imports[pkgPath] = ""
+		q.importNames[pkgName] = 0
+	} else {
 		if pkgName == outPkgName {
 			q.Imports[pkgPath] = fmt.Sprintf("%s_1", pkgName)
 			q.importNames[pkgName] = 1
@@ -138,6 +143,10 @@ func (iq *ImportQualifier) Qualifier(p *types.Package) string {
 	defaultName := p.Name()
 	path := p.Path()
 
+	if iq.isLocalTest && path == iq.pkgPath {
+		return ""
+	}
+
 	name, has := iq.Imports[path]
 	if has {
 		if name == "" {
@@ -161,4 +170,35 @@ func (iq *ImportQualifier) Qualifier(p *types.Package) string {
 	iq.importNames[defaultName] = 0
 
 	return defaultName
+}
+
+type VariablesContext struct {
+	importQualifier ImportQualifier
+
+	varNames map[string]int
+
+	uniqueNumber int
+	Fabrics      map[types.Type]*GeneratedFunc
+}
+
+func CreateVariablesContext(importQualifier ImportQualifier) *VariablesContext {
+	return &VariablesContext{
+		importQualifier: importQualifier,
+		uniqueNumber:    1,
+	}
+}
+
+func (vc *VariablesContext) CreateUniqueName(wanted string) string {
+	if idx, ok := vc.varNames[wanted]; ok {
+		vc.varNames[wanted] = idx + 1
+		return fmt.Sprintf("%s_%d", wanted, idx)
+	}
+
+	if idx, ok := vc.importQualifier.importNames[wanted]; ok {
+		vc.varNames[wanted] = idx + 1
+		return fmt.Sprintf("%s_%d", wanted, idx)
+	}
+
+	vc.varNames[wanted] = 1
+	return wanted
 }

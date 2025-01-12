@@ -63,9 +63,19 @@ func emitIndependentWrappers(
 
 	supportedInterfaces := pkgsPatternContent.GetSupportedInterfaces()
 	existedFuncs := pkgsPatternContent.Funcs
+	var constructors []*mod.Func
+	for _, constructor := range pkgFuncs.Constructors {
+		ctorInputParams := params(constructor.TypesFunc)
+		support, _ := checkParamSupport(ctorInputParams, supportedInterfaces, existedFuncs)
+		if support == noSupport {
+			continue
+		}
+		constructors = append(constructors, constructor)
+	}
 
-	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath)
+	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
 	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, qualifier.Qualifier)
+	init := mod.GenerateInitTestFunc(fabrics, constructors, qualifier.Qualifier)
 
 	// emit the intro material
 	emit("package %s\n\n", wrapperPkgName)
@@ -81,6 +91,8 @@ func emitIndependentWrappers(
 	for _, value := range fabrics {
 		emit("%s\n", value.Body)
 	}
+
+	emit("%s\n\n", init.Body)
 
 	// Loop over our the functions we are wrapping, emitting a wrapper where possible.
 	// We only return an error if all fail.
