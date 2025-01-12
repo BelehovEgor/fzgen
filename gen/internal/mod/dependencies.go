@@ -182,10 +182,14 @@ type VariablesContext struct {
 }
 
 func CreateVariablesContext(importQualifier *ImportQualifier) *VariablesContext {
+	varNames := make(map[string]int)
+	// all key word
+	varNames["package"] = 0
+
 	return &VariablesContext{
 		importQualifier: importQualifier,
 		uniqueNumber:    1,
-		varNames:        make(map[string]int),
+		varNames:        varNames,
 	}
 }
 

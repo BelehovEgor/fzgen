@@ -72,9 +72,10 @@ func emitIndependentWrappers(
 		}
 		constructors = append(constructors, constructor)
 	}
+	existedStructs := pkgsPatternContent.GetSupportedStructs()
 
 	qualifier := mod.CreateQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
-	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, qualifier)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, supportedInterfaces, existedFuncs, existedStructs, qualifier)
 	init := mod.GenerateInitTestFunc(fabrics, constructors, qualifier.Qualifier)
 
 	// emit the intro material

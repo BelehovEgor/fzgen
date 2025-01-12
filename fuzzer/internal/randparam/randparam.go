@@ -42,6 +42,8 @@ var SupportedInterfaces = map[string]bool{
 	"io.Closer":       true,
 	"io.ReadCloser":   true,
 	"context.Context": true,
+	"error":           true,
+	"interface{}":     true,
 }
 
 // Fuzzer generates random values for public members.
