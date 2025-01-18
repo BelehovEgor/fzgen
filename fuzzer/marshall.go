@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 )
 
 // unmarshalPlan consumes bytes to construct a Plan describing
@@ -23,9 +23,10 @@ import (
 //
 // It is the caller's responsibility to track how many bytes are consumed.
 // E.g., caller could do:
-//   buf := bytes.NewReader(data)
-//   pl := unmarshalPlan(buf, ...)
-//   used := len(data) - buf.Len()
+//
+//	buf := bytes.NewReader(data)
+//	pl := unmarshalPlan(buf, ...)
+//	used := len(data) - buf.Len()
 func unmarshalPlan(r io.Reader, steps []Step) plan.Plan {
 	pl := plan.Plan{}
 

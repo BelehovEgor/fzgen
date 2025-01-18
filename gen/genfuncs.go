@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/thepudds/fzgen/gen/internal/mod"
+	"github.com/BelehovEgor/fzgen/gen/internal/mod"
 )
 
 type wrapperOptions struct {

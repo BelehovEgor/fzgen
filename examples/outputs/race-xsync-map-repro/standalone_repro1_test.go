@@ -1,17 +1,20 @@
 // This deadlocks in puzpuzpuz/xsync.(*Map).Store -> puzpuzpuz/xsync.(*Map).doStore:
-//    - reproduces at github.com/puzpuzpuz/xsync@v1.0.1-0.20210823092703-32778049b5f5
-//    - fixed in github.com/puzpuzpuz/xsync@latest
+//   - reproduces at github.com/puzpuzpuz/xsync@v1.0.1-0.20210823092703-32778049b5f5
+//   - fixed in github.com/puzpuzpuz/xsync@latest
 //
 // Deadlock repro extracted from:
-//     fzgen -chain -parallel -pkg=github.com/thepudds/fzgen/examples/inputs/race-xsyncmap
-//     gotip test -fuzz=. -race
+//
+//	fzgen -chain -parallel -pkg=github.com/thepudds/fzgen/examples/inputs/race-xsyncmap
+//	gotip test -fuzz=. -race
 //
 // With the repro then emitted by:
-//     export FZDEBUG=repro=1
-//     gotip test -run=./170da805c157
+//
+//	export FZDEBUG=repro=1
+//	gotip test -run=./170da805c157
 //
 // This is now a normal Go test file. Note: need to run this test multiple times, such as:
-//     go test -count=10000 -timeout=10s
+//
+//	go test -count=10000 -timeout=10s
 //
 // Note: the original bug report was not via fzgen.
 // This just looked like an interesting bug to try to reproduce with fzgen
@@ -23,7 +26,7 @@ import (
 	"sync"
 	"testing"
 
-	xsyncmap "github.com/thepudds/fzgen/examples/inputs/race-xsync-map"
+	xsyncmap "github.com/BelehovEgor/fzgen/examples/inputs/race-xsync-map"
 )
 
 func TestRepro_NewXSyncMap_Chain(t *testing.T) {

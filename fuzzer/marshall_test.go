@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	raceexample "github.com/BelehovEgor/fzgen/examples/inputs/race"
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 	"github.com/google/go-cmp/cmp"
-	raceexample "github.com/thepudds/fzgen/examples/inputs/race"
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
 )
 
 func TestUnmarshalPlan(t *testing.T) {

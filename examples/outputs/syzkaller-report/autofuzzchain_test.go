@@ -5,9 +5,9 @@ package reportfuzz
 import (
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/google/syzkaller/pkg/mgrconfig"
 	"github.com/google/syzkaller/pkg/report"
-	"github.com/thepudds/fzgen/fuzzer"
 )
 
 func Fuzz_NewReporter_Chain(f *testing.F) {

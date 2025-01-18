@@ -6,8 +6,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/google/uuid"
-	"github.com/thepudds/fzgen/fuzzer"
 )
 
 // skipping Fuzz_NullUUID_Scan because parameters include unsupported interface: interface{}

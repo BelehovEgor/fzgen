@@ -5,8 +5,8 @@ package xsyncmapfuzz
 import (
 	"testing"
 
-	xsyncmap "github.com/thepudds/fzgen/examples/inputs/race-xsync-map"
-	"github.com/thepudds/fzgen/fuzzer"
+	xsyncmap "github.com/BelehovEgor/fzgen/examples/inputs/race-xsync-map"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewXSyncMap_Chain(f *testing.F) {

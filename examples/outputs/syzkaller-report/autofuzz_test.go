@@ -5,10 +5,10 @@ package reportfuzz
 import (
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/google/syzkaller/pkg/mgrconfig"
 	"github.com/google/syzkaller/pkg/report"
 	"github.com/google/syzkaller/sys/targets"
-	"github.com/thepudds/fzgen/fuzzer"
 )
 
 func Fuzz_Reporter_ContainsCrash(f *testing.F) {
@@ -86,7 +86,7 @@ func Fuzz_Reporter_Symbolize(f *testing.F) {
 
 func Fuzz_Type_String(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 report.Type
+		var t1 report.Report
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&t1)
 

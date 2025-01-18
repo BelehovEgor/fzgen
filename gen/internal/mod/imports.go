@@ -42,10 +42,10 @@ func NewQualifier(pkgName, pkgPath, outPkgName, outPkgPath string, isLocalTest b
 
 	if pkgName != "fuzzer" {
 		q.importNames[pkgName] = 0
-		q.Imports["github.com/thepudds/fzgen/fuzzer"] = ""
+		q.Imports["github.com/BelehovEgor/fzgen/fuzzer"] = ""
 	} else {
 		q.importNames[pkgName] = 1
-		q.Imports["github.com/thepudds/fzgen/fuzzer"] = "fuzzer_1"
+		q.Imports["github.com/BelehovEgor/fzgen/fuzzer"] = "fuzzer_1"
 	}
 
 	return q
