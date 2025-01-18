@@ -693,16 +693,18 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 			v.SetMapIndex(key, value)
 		}
 	case reflect.Struct:
-		err := f.fillUsingFabric(v, 0, opts)
+		typeName := v.Type().String()
+		_, has := f.typeFabricMap[typeName]
 
-		if err == nil {
-			break
-		}
-
-		for i := 0; i < v.NumField(); i++ {
-			if v.Field(i).CanSet() {
-				// TODO: could consider option for unexported fields
-				f.fill(v.Field(i), depth, opts)
+		if has {
+			var createStructUsingConstructor bool
+			return f.Fill2(&createStructUsingConstructor)
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				if v.Field(i).CanSet() {
+					// TODO: could consider option for unexported fields
+					f.fill(v.Field(i), depth, opts)
+				}
 			}
 		}
 	case reflect.Interface:
