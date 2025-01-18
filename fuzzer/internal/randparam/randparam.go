@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"reflect"
 )
@@ -147,7 +146,7 @@ func (f *Fuzzer) Data() []byte {
 //			  9 crypto/cipher.Block
 //			  8 net.Listener
 //			  6 go/ast.Node
-func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) bool {
+func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) error {
 	obj := reflectValue.Addr().Interface()
 	var b []byte
 	switch v := obj.(type) {
@@ -194,13 +193,12 @@ func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) bool {
 		f.Fill(&b)
 		*v = bytes.NewBuffer(b)
 
-	// Cases using ioutil.NopCloser(bytes.NewReader)
 	case *io.Closer:
 		f.Fill(&b)
-		*v = ioutil.NopCloser(bytes.NewReader(b))
+		*v = io.NopCloser(bytes.NewReader(b))
 	case *io.ReadCloser:
 		f.Fill(&b)
-		*v = ioutil.NopCloser(bytes.NewReader(b))
+		*v = io.NopCloser(bytes.NewReader(b))
 
 	// Cases using context.Background
 	case *context.Context:
@@ -208,14 +206,14 @@ func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) bool {
 
 	// No match
 	default:
-		return f.fillCustomInterface(reflectValue, 0, opts)
+		return f.fillUsingFabric(reflectValue, 0, opts)
 	}
-	return true
+	return nil
 }
 
-func (f *Fuzzer) fillCustomInterface(reflectValue reflect.Value, depth int, opts fillOpts) bool {
+func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fillOpts) error {
 	if f.typeFabricMap == nil {
-		return false
+		return fmt.Errorf("no fabrics")
 	}
 
 	isFirstInterfaceInStack := false
@@ -239,7 +237,7 @@ func (f *Fuzzer) fillCustomInterface(reflectValue reflect.Value, depth int, opts
 			f.used = nil
 		}
 
-		return true // nil
+		return fmt.Errorf("type %s is not supported", typeName)
 	}
 	countUnused := int8(len(unusedFabrics))
 
@@ -260,7 +258,14 @@ func (f *Fuzzer) fillCustomInterface(reflectValue reflect.Value, depth int, opts
 	}
 
 	res := fn.Call(args)
-	// now here constructors without error in result tuple
+	if len(res) == 2 {
+		err := res[1].Interface().(error)
+		if err != nil {
+			return err
+		}
+		reflectValue.Set(res[0])
+	}
+
 	if len(res) == 1 {
 		reflectValue.Set(res[0])
 	}
@@ -269,7 +274,7 @@ func (f *Fuzzer) fillCustomInterface(reflectValue reflect.Value, depth int, opts
 		f.used = nil
 	}
 
-	return true
+	return nil
 }
 
 func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
@@ -590,24 +595,24 @@ func (f *Fuzzer) Fill(obj interface{}) {
 	f.Fill2(obj)
 }
 
-func (f *Fuzzer) Fill2(obj interface{}) {
+func (f *Fuzzer) Fill2(obj interface{}) error {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
 		panic("fzgen: Fill requires pointers")
 	}
 	// indirect through pointer, and rescursively fill
 	v = v.Elem()
-	f.fill(v, 0, fillOpts{})
+	return f.fill(v, 0, fillOpts{})
 }
 
 type fillOpts struct {
 	panicOnUnsupported bool
 }
 
-func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
+func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 	depth++
 	if depth > 10 {
-		return
+		return nil
 	}
 
 	switch v.Kind() {
@@ -688,6 +693,12 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
 			v.SetMapIndex(key, value)
 		}
 	case reflect.Struct:
+		err := f.fillUsingFabric(v, 0, opts)
+
+		if err == nil {
+			break
+		}
+
 		for i := 0; i < v.NumField(); i++ {
 			if v.Field(i).CanSet() {
 				// TODO: could consider option for unexported fields
@@ -695,10 +706,8 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
 			}
 		}
 	case reflect.Interface:
-		success := f.fillInterface(v, opts)
-		if !success && opts.panicOnUnsupported {
-			panic(fmt.Sprintf("fzgen: fill: unsupported interface kind %v for value %v of type %v", v.Kind(), v, v.Type()))
-		}
+		err := f.fillInterface(v, opts)
+		return err
 	case reflect.Ptr:
 		// create a zero value elem, then recursively fill that
 		v.Set(reflect.New(v.Type().Elem()))
@@ -717,6 +726,8 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) {
 	default:
 		panic(fmt.Sprintf("fzgen: fill: unexpected kind %v for value %v of type %v", v.Kind(), v, v.Type()))
 	}
+
+	return nil
 }
 
 // numericDraw calculates the bytes that should be

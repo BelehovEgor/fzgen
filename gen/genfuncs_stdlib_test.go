@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
@@ -21,28 +20,24 @@ func TestStrings(t *testing.T) {
 		t.Skip("skipping stdlib test because it expects strings package from Go 1.17")
 	}
 	tests := []struct {
-		name               string // Note: we use the test name also as the golden filename
-		onlyExported       bool
-		qualifyAll         bool
-		insertConstructors bool
+		name         string // Note: we use the test name also as the golden filename
+		onlyExported bool
+		qualifyAll   bool
 	}{
 		{
-			name:               "strings_inject_ctor_true_exported_not_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         true,
-			insertConstructors: true,
+			name:         "strings_inject_ctor_true_exported_not_local_pkg.go",
+			onlyExported: true,
+			qualifyAll:   true,
 		},
 		{
-			name:               "strings_inject_ctor_false_exported_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         false,
-			insertConstructors: true,
+			name:         "strings_inject_ctor_false_exported_local_pkg.go",
+			onlyExported: true,
+			qualifyAll:   false,
 		},
 		{
-			name:               "strings_inject_ctor_false_exported_not_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         true,
-			insertConstructors: false,
+			name:         "strings_inject_ctor_false_exported_not_local_pkg.go",
+			onlyExported: true,
+			qualifyAll:   true,
 		},
 	}
 
@@ -55,21 +50,19 @@ func TestStrings(t *testing.T) {
 			if tt.onlyExported {
 				options |= flagRequireExported
 			}
-			pkgs, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
+			analyzeResult, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
 			if err != nil {
 				t.Fatalf("findFuncsGrouped() failed: %v", err)
 			}
+			pkgs := analyzeResult.Packages
 			if len(pkgs) != 1 {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
-			allContent := mod.Merge(pkgs)
-
 			wrapperOpts := wrapperOptions{
-				qualifyAll:         tt.qualifyAll,
-				insertConstructors: tt.insertConstructors,
+				qualifyAll: tt.qualifyAll,
 			}
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
+			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}

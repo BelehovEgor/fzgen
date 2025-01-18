@@ -1,6 +1,9 @@
 package supportedinterface
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 type Printer interface {
 	Print(s string) int
@@ -39,6 +42,22 @@ type A struct {
 
 func (a A) Do(printer Printer) bool {
 	return true
+}
+
+func NewA() A {
+	return A{}
+}
+
+func NewPointerA() (*A, error) {
+	return &A{}, nil
+}
+
+func newPointerA() (*A, error) {
+	return &A{}, nil
+}
+
+func NewComplexA(writer io.ByteReader) A {
+	return A{}
 }
 
 func MySubEmitter(lvl int, format string, args ...interface{}) {

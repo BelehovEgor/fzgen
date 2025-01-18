@@ -2,6 +2,7 @@ package examplefuzz
 
 import (
 	"io"
+	"reflect"
 	"testing"
 
 	"github.com/thepudds/fzgen/fuzzer"
@@ -9,106 +10,125 @@ import (
 
 func Fuzz_TypeExported_PointerExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 *TypeExported
+		var t_0 *TypeExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
-		if t1 == nil {
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil || t_0 == nil {
 			return
 		}
 
-		t1.PointerExportedMethod(i)
+		t_0.PointerExportedMethod(i)
 	})
 }
 
 func Fuzz_TypeExported_pointerRcvNotExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 *TypeExported
+		var t_0 *TypeExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
-		if t1 == nil {
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil || t_0 == nil {
 			return
 		}
 
-		t1.pointerRcvNotExportedMethod(i)
+		t_0.pointerRcvNotExportedMethod(i)
 	})
 }
 
 func Fuzz_typeNotExported_PointerExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 *typeNotExported
+		var t_0 *typeNotExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
-		if t1 == nil {
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil || t_0 == nil {
 			return
 		}
 
-		t1.PointerExportedMethod(i)
+		t_0.PointerExportedMethod(i)
 	})
 }
 
 func Fuzz_typeNotExported_pointerRcvNotExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 *typeNotExported
+		var t_0 *typeNotExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
-		if t1 == nil {
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil || t_0 == nil {
 			return
 		}
 
-		t1.pointerRcvNotExportedMethod(i)
+		t_0.pointerRcvNotExportedMethod(i)
 	})
 }
 
 func Fuzz_TypeExported_NonPointerExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 TypeExported
+		var t_0 TypeExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil {
+			return
+		}
 
-		t1.NonPointerExportedMethod(i)
+		t_0.NonPointerExportedMethod(i)
 	})
 }
 
 func Fuzz_TypeExported_nonPointerRcvNotExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 TypeExported
+		var t_0 TypeExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil {
+			return
+		}
 
-		t1.nonPointerRcvNotExportedMethod(i)
+		t_0.nonPointerRcvNotExportedMethod(i)
 	})
 }
 
 func Fuzz_typeNotExported_NonPointerExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 typeNotExported
+		var t_0 typeNotExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil {
+			return
+		}
 
-		t1.NonPointerExportedMethod(i)
+		t_0.NonPointerExportedMethod(i)
 	})
 }
 
 func Fuzz_typeNotExported_nonPointerRcvNotExportedMethod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var t1 typeNotExported
+		var t_0 typeNotExported
 		var i int
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&t1, &i)
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&t_0, &i)
+		if err != nil {
+			return
+		}
 
-		t1.nonPointerRcvNotExportedMethod(i)
+		t_0.nonPointerRcvNotExportedMethod(i)
 	})
 }
 
 func Fuzz_FuncExported(f *testing.F) {
-	f.Fuzz(func(t *testing.T, i int) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var i int
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&i)
+		if err != nil {
+			return
+		}
+
 		FuncExported(i)
 	})
 }
@@ -116,17 +136,34 @@ func Fuzz_FuncExported(f *testing.F) {
 func Fuzz_FuncExportedUsesSupportedInterface(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var w io.Reader
-		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&w)
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&w)
+		if err != nil {
+			return
+		}
 
 		FuncExportedUsesSupportedInterface(w)
 	})
 }
 
-// skipping Fuzz_FuncExportedUsesUnsupportedInterface because parameters include func, chan, or unsupported interface: github.com/thepudds/fzgen/examples/inputs/test-exported.ExportedInterface
+// skipping Fuzz_FuncExportedUsesUnsupportedInterface because parameters include unsupported type: github.com/thepudds/fzgen/examples/inputs/test-exported.ExportedInterface
 
 func Fuzz_funcNotExported(f *testing.F) {
-	f.Fuzz(func(t *testing.T, i int) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var i int
+		fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)
+		err := fz.Fill2(&i)
+		if err != nil {
+			return
+		}
+
 		funcNotExported(i)
 	})
+}
+
+var FabricFuncsForCustomTypes map[string][]reflect.Value
+
+func TestMain(m *testing.M) {
+	FabricFuncsForCustomTypes = make(map[string][]reflect.Value)
+	m.Run()
 }

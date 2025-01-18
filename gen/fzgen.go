@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
@@ -66,16 +65,12 @@ func FzgenMain() int {
 	}
 
 	// Most commonly used:
-	chainFlag := flag.Bool("chain", false, "loop over the methods of an object, which requires finding a suitable constructor in the same package and which is controllable via the -ctor flag.")
-	parallelFlag := flag.Bool("parallel", false, "indicates an emitted chain can be run in parallel. requires -chain")
 	outFileFlag := flag.String("o", "autofuzz_test.go", "output file name. defaults to autofuzz_test.go or autofuzzchain_test.go")
 	constructorPatternFlag := flag.String("ctor", ".", "regexp to use if searching for constructors to automatically use.")
 
 	// Less commonly used:
 	funcPatternFlag := flag.String("func", ".", "function regex, defaults to matching all candidate functions")
 	unexportedFlag := flag.Bool("unexported", false, "emit wrappers for unexported functions in addition to exported functions")
-	constructorFlag := flag.Bool("ctorinject", true, "automatically insert constructors when wrapping a method call "+
-		"if a suitable constructor can be found in the same package.")
 
 	flag.Parse()
 
@@ -91,27 +86,18 @@ func FzgenMain() int {
 		pkgPattern = "."
 	}
 
-	if *parallelFlag && !*chainFlag {
-		fmt.Fprint(os.Stderr, "fzgen: -parallel flag requires -chain\n")
-		return 2
-	}
-
-	if *chainFlag && *outFileFlag == "autofuzz_test.go" {
-		*outFileFlag = "autofuzzchain_test.go"
-	}
-
 	// Search for functions in the requested packages that match the supplied func and ctor regex.
 	options := flagExcludeFuzzPrefix | flagMultiMatch
 	if !*unexportedFlag {
 		options |= flagRequireExported
 	}
-	pkgs, err := findFuncsGrouped(pkgPattern, *funcPatternFlag, *constructorPatternFlag, options)
+	analyzeResult, err := findFuncsGrouped(pkgPattern, *funcPatternFlag, *constructorPatternFlag, options)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fzgen: %v\n", err)
 		return 1
 	}
 
-	pkgsPatternContent := mod.Merge(pkgs)
+	pkgs := analyzeResult.Packages
 
 	// Check if we are looking at one package vs. multiple.
 	if len(pkgs) > 1 && hasPath(*outFileFlag) {
@@ -178,38 +164,14 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll:         qualifyAll,
-			insertConstructors: *constructorFlag,
-			parallel:           *parallelFlag,
-			topComment:         topComment,
+			qualifyAll: qualifyAll,
+			topComment: topComment,
 		}
 
 		// Do the actual work of emitting our wrappers.
-		var out []byte
-		if !*chainFlag {
-			out, err = emitIndependentWrappers(outDir, pkgs[i], pkgsPatternContent, wrapperPkgName, wrapperOpts)
-		} else {
-			out, err = emitChainWrappers(outDir, pkgs[i], wrapperPkgName, wrapperOpts)
-		}
+		out, err := emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+
 		// Handle certain common errors gracefully, including skipping & continuing if multiple target packages.
-		msgDest, msgPrefix := os.Stderr, "fzgen:"
-		if len(pkgs) > 1 {
-			msgDest, msgPrefix = os.Stdout, fmt.Sprintf("fzgen: skipping %s:", pkgs[i].PkgPath)
-		}
-		switch {
-		case errors.Is(err, errUnsupportedParams), errors.Is(err, errNoMethodsMatch), errors.Is(err, errNoSteps), errors.Is(err, errNoFunctionsMatch):
-			fmt.Fprintf(msgDest, "%s %v\n", msgPrefix, err)
-			if len(pkgs) > 1 {
-				continue
-			}
-			return 1
-		case errors.Is(err, errNoConstructorsMatch):
-			fmt.Fprintf(msgDest, "%s %v for -ctor pattern %q\n", msgPrefix, err, *constructorPatternFlag)
-			if len(pkgs) > 1 {
-				continue
-			}
-			return 1
-		}
 		if err != nil {
 			fail(err)
 		}

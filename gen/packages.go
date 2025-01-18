@@ -24,10 +24,15 @@ const (
 	flagRequireExported
 )
 
+type analyzeResult struct {
+	Packages    []*mod.Package
+	TypeContext *mod.TypeContext
+}
+
 // findFuncsGrouped searches for requested functions matching a package pattern and func pattern,
 // returning them grouped by package.
-func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags findFuncFlag) ([]*mod.Package, error) {
-	report := func(err error) ([]*mod.Package, error) {
+func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags findFuncFlag) (*analyzeResult, error) {
+	report := func(err error) (*analyzeResult, error) {
 		return nil, fmt.Errorf("finding funcs: %v", err)
 	}
 
@@ -35,35 +40,22 @@ func findFuncsGrouped(pkgPattern, funcPattern, constructorPattern string, flags 
 	if err != nil {
 		return report(err)
 	}
-	constructorRe, err := regexp.Compile(constructorPattern)
+
+	conRe, err := regexp.Compile(constructorPattern)
 	if err != nil {
 		return report(err)
 	}
 
-	pkgs, err := findFuncs(pkgPattern, funcRe, constructorRe, nil, flags)
+	analyzeResult, err := findFuncs(pkgPattern, funcRe, conRe, nil, flags)
 	if err != nil {
 		return report(err)
 	}
 
-	for _, p := range pkgs {
-		// put constructors a deterministic order.
-		// TODO: for now, we'll prefer simpler constructors as approximated by length (so 'New' before 'NewSomething').
-		sort.Slice(p.Constructors, func(i, j int) bool {
-			if len(p.Constructors[i].FuncName) < len(p.Constructors[j].FuncName) {
-				return true
-			}
-			if len(p.Constructors[i].FuncName) == len(p.Constructors[j].FuncName) {
-				return p.Constructors[i].FuncName < p.Constructors[j].FuncName
-			}
-			return false
-		})
-	}
-
-	sort.Slice(pkgs, func(i, j int) bool {
-		return pkgs[i].PkgPath < pkgs[j].PkgPath
+	sort.Slice(analyzeResult.Packages, func(i, j int) bool {
+		return analyzeResult.Packages[i].PkgPath < analyzeResult.Packages[j].PkgPath
 	})
 
-	return pkgs, nil
+	return analyzeResult, nil
 }
 
 func findFuncs(
@@ -71,7 +63,7 @@ func findFuncs(
 	funcPattern, conPattern *regexp.Regexp,
 	env []string,
 	flags findFuncFlag,
-) ([]*mod.Package, error) {
+) (*analyzeResult, error) {
 	report := func(err error) error {
 		return fmt.Errorf("error while loading packages for pattern %v: %v", pkgPattern, err)
 	}
@@ -102,11 +94,17 @@ func findFuncs(
 }
 
 func getPackagesContent(
-	pkgs []*packages.Package, env []string, funcPattern, conPattern *regexp.Regexp, flags findFuncFlag) ([]*mod.Package, error) {
+	pkgs []*packages.Package,
+	env []string,
+	funcPattern, conPattern *regexp.Regexp,
+	flags findFuncFlag,
+) (*analyzeResult, error) {
 	pkgsContent := make([]*mod.Package, 0)
 
+	typesContext := mod.NewTypeContext(conPattern)
+
 	for _, pkg := range pkgs {
-		content, err := getPackageContent(pkg, env, funcPattern, conPattern, flags)
+		content, err := getPackageContent(typesContext, pkg, env, funcPattern, flags)
 
 		if err != nil {
 			return nil, err
@@ -115,26 +113,23 @@ func getPackagesContent(
 		pkgsContent = append(pkgsContent, content)
 	}
 
-	for _, pkgA := range pkgsContent {
-		for _, _pkgB := range pkgsContent {
-			setStructImplementedInterfaces(pkgA.Structs, _pkgB.Interfaces)
-		}
-	}
-
-	return pkgsContent, nil
+	return &analyzeResult{
+		Packages:    pkgsContent,
+		TypeContext: typesContext,
+	}, nil
 }
 
 func getPackageContent(
+	typeContext *mod.TypeContext,
 	pkg *packages.Package,
 	env []string,
-	funcPattern, conPattern *regexp.Regexp,
+	funcPattern *regexp.Regexp,
 	flags findFuncFlag,
 ) (*mod.Package, error) {
 	pkgDir := ""
 	var err error
 
 	targets := make([]*mod.Func, 0)
-	constructors := make([]*mod.Func, 0)
 	funcs := make([]*mod.Func, 0)
 	structs := make([]*mod.Struct, 0)
 	interfaces := make([]*mod.Interface, 0)
@@ -158,23 +153,27 @@ func getPackageContent(
 			switch t := obj.Type().(type) {
 			case *types.Named:
 				if types.IsInterface(t) {
-					interfaces = append(interfaces, &mod.Interface{
+					i := &mod.Interface{
 						InterfaceName:  id.Name,
 						PkgName:        pkg.Name,
 						PkgPath:        pkg.PkgPath,
 						PkgDir:         pkgDir,
 						TypesInterface: objType.Type().Underlying().(*types.Interface),
 						TypesNamed:     t,
-					})
+					}
+					interfaces = append(interfaces, i)
+					typeContext.AddInterface(i)
 				} else if structType, ok := objType.Type().Underlying().(*types.Struct); ok {
-					structs = append(structs, &mod.Struct{
+					s := &mod.Struct{
 						StructName:  id.Name,
 						PkgName:     pkg.Name,
 						PkgPath:     pkg.PkgPath,
 						PkgDir:      pkgDir,
 						TypesStruct: structType,
 						TypesNamed:  t,
-					})
+					}
+					structs = append(structs, s)
+					typeContext.AddStruct(s)
 				}
 			case *types.TypeParam:
 				// TODO support generics
@@ -190,8 +189,10 @@ func getPackageContent(
 			}
 
 			funcs = append(funcs, &f)
+			typeContext.AddFunc(&f)
+
 			addTarget(&targets, &f, funcPattern, flags)
-			addConstructor(&constructors, &f, conPattern)
+			typeContext.TryAddAsConstructor(&f)
 		}
 	}
 
@@ -200,13 +201,12 @@ func getPackageContent(
 	}
 
 	return &mod.Package{
-		PkgName:      pkg.Name,
-		PkgPath:      pkg.PkgPath,
-		Targets:      targets,
-		Constructors: constructors,
-		Funcs:        funcs,
-		Structs:      structs,
-		Interfaces:   interfaces,
+		PkgName:    pkg.Name,
+		PkgPath:    pkg.PkgPath,
+		Targets:    targets,
+		Funcs:      funcs,
+		Structs:    structs,
+		Interfaces: interfaces,
 	}, nil
 }
 
@@ -242,36 +242,6 @@ func addTarget(targets *[]*mod.Func, f *mod.Func, funcPattern *regexp.Regexp, fl
 	}
 
 	return nil
-}
-
-func addConstructor(
-	constructors *[]*mod.Func,
-	f *mod.Func,
-	constructorRe *regexp.Regexp,
-) {
-	if isConstructor(f.TypesFunc) && constructorRe.MatchString(f.FuncName) && f.TypesFunc.Exported() {
-		*constructors = append(*constructors, f)
-	}
-}
-
-func setStructImplementedInterfaces(structs []*mod.Struct, interfaces []*mod.Interface) {
-	for _, _struct := range structs {
-		for _, _interface := range interfaces {
-			if types.AssignableTo(_struct.TypesNamed, _interface.TypesInterface) {
-				_interface.Implementations = append(_interface.Implementations, _struct)
-			} else if types.AssignableTo(types.NewPointer(_struct.TypesNamed), _interface.TypesInterface) {
-				_interface.Implementations = append(_interface.Implementations, &mod.Struct{
-					StructName:  _struct.StructName,
-					PkgName:     _struct.PkgName,
-					PkgPath:     _struct.PkgPath,
-					PkgDir:      _struct.PkgDir,
-					TypesStruct: _struct.TypesStruct,
-					TypesNamed:  _struct.TypesNamed,
-					AsPointer:   true,
-				})
-			}
-		}
-	}
 }
 
 // goListDir returns the dir for a package import path.

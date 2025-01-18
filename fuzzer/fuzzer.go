@@ -117,18 +117,23 @@ func (fz *Fuzzer) Fill(x ...interface{}) {
 	}
 }
 
-func (fz *Fuzzer) FillWithFabrics(typeFabricMap map[string][]reflect.Value, x ...interface{}) {
+func (fz *Fuzzer) Fill2(x ...interface{}) error {
 	// TODO: probably panic if called from within Chain.
 	for _, arg := range x {
 		before := fz.randparamFuzzer.Remaining()
 
-		fz.randparamFuzzer.Fill(arg)
+		err := fz.randparamFuzzer.Fill2(arg)
+		if err != nil {
+			return err
+		}
 
 		if debugPrintPlan {
 			fmt.Printf("fzgen: filled object of type \"%T\" using %d bytes. %d bytes remaining.\n",
 				arg, before-fz.randparamFuzzer.Remaining(), fz.randparamFuzzer.Remaining())
 		}
 	}
+
+	return nil
 }
 
 type execState struct {

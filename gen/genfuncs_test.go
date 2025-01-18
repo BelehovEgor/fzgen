@@ -3,12 +3,12 @@ package gen
 import (
 	"flag"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/thepudds/fzgen/gen/internal/mod"
 	"golang.org/x/tools/imports"
 )
 
@@ -42,22 +42,21 @@ func TestTypes(t *testing.T) {
 			if tt.onlyExported {
 				options |= flagRequireExported
 			}
-			pkgs, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
+			analyzeResult, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
 			if err != nil {
 				t.Fatalf("findFuncsGrouped() failed: %v", err)
 			}
+			pkgs := analyzeResult.Packages
 			if len(pkgs) != 1 {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
-			allContent := mod.Merge(pkgs)
-
 			wrapperOpts := wrapperOptions{
-				qualifyAll:         tt.qualifyAll,
-				insertConstructors: true,
+				qualifyAll: tt.qualifyAll,
 			}
 
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
+			golden := filepath.Join("..", "testdata", tt.name)
+			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
@@ -67,15 +66,14 @@ func TestTypes(t *testing.T) {
 			}
 
 			got := string(out)
-			golden := filepath.Join("..", "testdata", tt.name)
 			if *updateFlag {
 				// Note: using Fatalf above including so that we don't update if there was an earlier failure.
-				err = ioutil.WriteFile(golden, []byte(got), 0o644)
+				err = os.WriteFile(golden, []byte(got), 0o644)
 				if err != nil {
 					t.Fatalf("failed to update golden file: %v", err)
 				}
 			}
-			b, err := ioutil.ReadFile(golden)
+			b, err := os.ReadFile(golden)
 			if err != nil {
 				t.Fatalf("failed to read golden file: %v", err)
 			}
@@ -92,42 +90,23 @@ func TestTypes(t *testing.T) {
 
 func TestConstructorInjection(t *testing.T) {
 	tests := []struct {
-		name               string // Note: we use the test name also as the golden filename
-		onlyExported       bool
-		qualifyAll         bool
-		injectConstructors bool
+		name         string // Note: we use the test name also as the golden filename
+		onlyExported bool
+		qualifyAll   bool
 	}{
 		{
 			// this corresponds roughly to:
 			//    fzgen -ctors -pkg=github.com/thepudds/fzgo/genfuzzfuncs/examples/test-constructor-injection
-			name:               "inject_ctor_true_exported_not_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         true,
-			injectConstructors: true,
-		},
-		{
-			// this corresponds roughly to:
-			//    fzgen -ctors=false -pkg=github.com/thepudds/fzgo/genfuzzfuncs/examples/test-constructor-injection
-			name:               "inject_ctor_false_exported_not_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         true,
-			injectConstructors: false,
+			name:         "inject_ctor_true_exported_not_local_pkg.go",
+			onlyExported: true,
+			qualifyAll:   true,
 		},
 		{
 			// this corresponds roughly to:
 			//    genfuzzfuncs -ctors -qualifyall=false -pkg=github.com/thepudds/fzgo/genfuzzfuncs/examples/test-constructor-injection
-			name:               "inject_ctor_true_exported_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         false,
-			injectConstructors: true,
-		},
-		{
-			// this corresponds roughly to:
-			//    genfuzzfuncs -ctors=false -qualifyall=false -pkg=github.com/thepudds/fzgo/genfuzzfuncs/examples/test-constructor-injection
-			name:               "inject_ctor_false_exported_local_pkg.go",
-			onlyExported:       true,
-			qualifyAll:         false,
-			injectConstructors: false,
+			name:         "inject_ctor_true_exported_local_pkg.go",
+			onlyExported: true,
+			qualifyAll:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -139,21 +118,20 @@ func TestConstructorInjection(t *testing.T) {
 			if tt.onlyExported {
 				options |= flagRequireExported
 			}
-			pkgs, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
+			analyzeResult, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
 			if err != nil {
 				t.Fatalf("findFuncsGrouped() failed: %v", err)
 			}
+			pkgs := analyzeResult.Packages
 			if len(pkgs) != 1 {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
-			allContent := mod.Merge(pkgs)
-
 			wrapperOpts := wrapperOptions{
-				qualifyAll:         tt.qualifyAll,
-				insertConstructors: tt.injectConstructors,
+				qualifyAll: tt.qualifyAll,
 			}
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
+			golden := filepath.Join("..", "testdata", tt.name)
+			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
@@ -163,7 +141,6 @@ func TestConstructorInjection(t *testing.T) {
 			}
 
 			got := string(out)
-			golden := filepath.Join("..", "testdata", tt.name)
 			if *updateFlag {
 				// Note: using Fatalf above including so that we don't update if there was an earlier failure.
 				err = ioutil.WriteFile(golden, []byte(got), 0o644)
@@ -227,22 +204,21 @@ func TestExported(t *testing.T) {
 			if tt.onlyExported {
 				options |= flagRequireExported
 			}
-			pkgs, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
+			analyzeResult, err := findFuncsGrouped(pkgPattern, ".", "^New", options)
 			if err != nil {
 				t.Fatalf("findFuncsGrouped() failed: %v", err)
 			}
+			pkgs := analyzeResult.Packages
 			if len(pkgs) != 1 {
 				t.Fatalf("findFuncsGrouped() found unexpected pkgs count: %d", len(pkgs))
 			}
 
-			allContent := mod.Merge(pkgs)
-
 			wrapperOpts := wrapperOptions{
-				qualifyAll:         tt.qualifyAll,
-				insertConstructors: true,
+				qualifyAll: tt.qualifyAll,
 			}
 
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], allContent, "examplefuzz", wrapperOpts)
+			golden := filepath.Join("..", "testdata", tt.name)
+			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
@@ -252,7 +228,6 @@ func TestExported(t *testing.T) {
 			}
 
 			got := string(out)
-			golden := filepath.Join("..", "testdata", tt.name)
 			if *updateFlag {
 				// Note: using Fatalf above including so that we don't update if there was an earlier failure.
 				err = ioutil.WriteFile(golden, []byte(got), 0o644)
