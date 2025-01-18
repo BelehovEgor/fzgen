@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	uuid "github.com/thepudds/fzgen/examples/inputs/test-chain-uuid"
-	"github.com/thepudds/fzgen/fuzzer"
+	uuid "github.com/BelehovEgor/fzgen/examples/inputs/test-chain-uuid"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewFromBytes_Chain(f *testing.F) {

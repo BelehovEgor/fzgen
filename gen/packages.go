@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/thepudds/fzgen/gen/internal/mod"
+	"github.com/BelehovEgor/fzgen/gen/internal/mod"
 	"golang.org/x/tools/go/packages"
 )
 

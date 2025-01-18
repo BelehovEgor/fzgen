@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/google/uuid"
-	"github.com/thepudds/fzgen/fuzzer"
 )
 
 func Fuzz_FromBytes_Chain(f *testing.F) {

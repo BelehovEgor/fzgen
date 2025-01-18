@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
+	gen "github.com/BelehovEgor/fzgen/gen"
 	"github.com/rogpeppe/go-internal/gotooltest"
 	"github.com/rogpeppe/go-internal/testscript"
-	gen "github.com/thepudds/fzgen/gen"
 )
 
 var (

@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	fuzzwrapexamples "github.com/thepudds/fzgen/examples/inputs/test-exported"
-	"github.com/thepudds/fzgen/fuzzer"
+	fuzzwrapexamples "github.com/BelehovEgor/fzgen/examples/inputs/test-exported"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_TypeExported_PointerExportedMethod(f *testing.F) {
@@ -63,7 +63,7 @@ func Fuzz_FuncExportedUsesSupportedInterface(f *testing.F) {
 	})
 }
 
-// skipping Fuzz_FuncExportedUsesUnsupportedInterface because parameters include unsupported type: github.com/thepudds/fzgen/examples/inputs/test-exported.ExportedInterface
+// skipping Fuzz_FuncExportedUsesUnsupportedInterface because parameters include unsupported type: github.com/BelehovEgor/fzgen/examples/inputs/test-exported.ExportedInterface
 
 var FabricFuncsForCustomTypes map[string][]reflect.Value
 

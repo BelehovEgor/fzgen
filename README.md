@@ -26,8 +26,8 @@ $ go mod init example
 
 Download and install the fzgen binary from source, as well as add its fuzzer to our go.mod:
 ```
-$ go install github.com/thepudds/fzgen/cmd/fzgen@latest
-$ go get github.com/thepudds/fzgen/fuzzer
+$ go install github.com/BelehovEgor/fzgen/cmd/fzgen@latest
+$ go get github.com/BelehovEgor/fzgen/fuzzer
 ```
 
 Use fzgen to automatically create a set of fuzz targets — in this case for the encoding/ascii85 package from the Go standard library:
@@ -57,9 +57,9 @@ That's enough for you to get started on your own, but let's also briefly look at
 
 ## What Do Some Fuzzing Targets Look Like?
 
-When we ran fzgen above against `encoding/ascii85`, it automatically created a set of [six](https://github.com/thepudds/fzgen/blob/main/examples/outputs/stdlib-encoding-ascii85/autofuzz_test.go) independent fuzzing targets.
+When we ran fzgen above against `encoding/ascii85`, it automatically created a set of [six](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/stdlib-encoding-ascii85/autofuzz_test.go) independent fuzzing targets.
 
-A different example is `fzgen github.com/google/syzkaller/pkg/report`, which generates [ten](https://github.com/thepudds/fzgen/blob/main/examples/outputs/syzkaller-report/autofuzz_test.go) independent fuzzing targets.
+A different example is `fzgen github.com/google/syzkaller/pkg/report`, which generates [ten](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/syzkaller-report/autofuzz_test.go) independent fuzzing targets.
 
 Let's look at one of them more closely — the code targeting the [Symbolize](https://pkg.go.dev/github.com/google/syzkaller@v0.0.0-20220105142835-6acc789ad3f6/pkg/report#Reporter.Symbolize) method on the [Reporter](https://pkg.go.dev/github.com/google/syzkaller@v0.0.0-20220105142835-6acc789ad3f6/pkg/report#Reporter) type, along with some added explanatory comments:
 
@@ -108,7 +108,7 @@ But what if we wanted to target multiple methods at once? That's where `-chain` 
 Again starting from an empty directory, we'll set up a module, and add the fzgen fuzzer to go.mod:
 ```
 $ go mod init temp
-$ go get github.com/thepudds/fzgen/fuzzer
+$ go get github.com/BelehovEgor/fzgen/fuzzer
 ```
 
 Next, we automatically create a new fuzz target. This time:
@@ -116,7 +116,7 @@ Next, we automatically create a new fuzz target. This time:
  * We also tell fzgen that it should in theory be safe to do parallel execution of those methods across multiple goroutines (via the `-parallel` argument).
 
 ```
-$ fzgen -chain -parallel github.com/thepudds/fzgen/examples/inputs/race
+$ fzgen -chain -parallel github.com/BelehovEgor/fzgen/examples/inputs/race
 fzgen: created autofuzzchain_test.go
 ```
 
@@ -178,7 +178,7 @@ This will output a snippet of valid Go code that was "discovered" at execution t
 
 #### What just happened?
 
-Rewinding slightly, if you look at the code you just automatically generated in [autofuzzchain_test.go](https://github.com/thepudds/fzgen/blob/main/examples/outputs/race/autofuzzchain_test.go), you can see fzgen emitted code that calls a constructor to create a target struct:
+Rewinding slightly, if you look at the code you just automatically generated in [autofuzzchain_test.go](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/race/autofuzzchain_test.go), you can see fzgen emitted code that calls a constructor to create a target struct:
 
 ```go
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -255,7 +255,7 @@ For this bug, it usually takes hundreds of thousands of coverage-guided runtime 
 Just running a regular test under the race detector might not catch that bug, including because the race detector [only finds data races that happen at execution time](https://go.dev/blog/race-detector), which means a diversity of code paths and input data are important for the race detector to do its job.
 fz.Chain helps supply those code paths and data.
 
-For that bug to be observable by the race detector, [it](https://github.com/thepudds/fzgen/blob/main/examples/inputs/race/race.go#L34-L36) requires:
+For that bug to be observable by the race detector, [it](https://github.com/BelehovEgor/fzgen/blob/main/examples/inputs/race/race.go#L34-L36) requires:
 
   1. A Store must complete, then be followed by two Loads, and all three must use the same key.
   2. The Store must have certain payload data (`Answer: 42`).
@@ -267,14 +267,14 @@ fz.Chain has logic to sometimes re-use input arguments of the same type across d
 
 ## Example: Finding a Real Concurrency Bug in Real Code
 
-The prior example was a small but challenging example that takes a few minutes of fuzzing to find, but you can see an example of a deadlock found in real code [here](https://github.com/thepudds/fzgen/blob/main/examples/outputs/race-xsync-map-repro/standalone_repro1_test.go) from the xsync.Map from github.com/puzpuzpuz/xsync.
+The prior example was a small but challenging example that takes a few minutes of fuzzing to find, but you can see an example of a deadlock found in real code [here](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/race-xsync-map-repro/standalone_repro1_test.go) from the xsync.Map from github.com/puzpuzpuz/xsync.
 
 In this case, it usually takes fz.Chain several million coverage-guided variations over a few hours of executing the generated 
- [autogenchain_test.go](https://github.com/thepudds/fzgen/blob/main/examples/outputs/race-xsync-map/autofuzzchain_test.go) before it finds the deadlock.
+ [autogenchain_test.go](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/race-xsync-map/autofuzzchain_test.go) before it finds the deadlock.
 
 Interestingly, the deadlock then typically only reproduces about 1 out of 1,000 attempts for a particular discovered problematic calling pattern and arguments.
 
-Fortunately, once a problem is reported, we can paste the output of `FZDEBUG=repro=1` into a [standalone_repro_test.go](https://github.com/thepudds/fzgen/blob/main/examples/outputs/race-xsync-map-repro/standalone_repro1_test.go) file and use the handy `-count` argument in a normal `go test -count=10000` invocation, and now we can reproduce the deadlock cleanly on demand. At that point, the reproducer is completely standalone and does not rely on fzgen any longer.
+Fortunately, once a problem is reported, we can paste the output of `FZDEBUG=repro=1` into a [standalone_repro_test.go](https://github.com/BelehovEgor/fzgen/blob/main/examples/outputs/race-xsync-map-repro/standalone_repro1_test.go) file and use the handy `-count` argument in a normal `go test -count=10000` invocation, and now we can reproduce the deadlock cleanly on demand. At that point, the reproducer is completely standalone and does not rely on fzgen any longer.
 
 ## fzgen status
 
@@ -289,6 +289,6 @@ Any and all feedback is welcome! :grinning:
 
 Please feel free to open a new issue here, or to contact the author on Twitter ([@thepudds1](https://twitter.com/thepudds1)).
 
-The [Roadmap](https://github.com/thepudds/fzgen/wiki/Roadmap) wiki page is a reasonable starting place.
+The [Roadmap](https://github.com/BelehovEgor/fzgen/wiki/Roadmap) wiki page is a reasonable starting place.
 
 If you made it this far — thanks!

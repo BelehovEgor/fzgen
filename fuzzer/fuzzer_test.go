@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 	"github.com/google/go-cmp/cmp"
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
 )
 
 func TestCallStep(t *testing.T) {
@@ -207,8 +207,9 @@ func TestFuzzerChain(t *testing.T) {
 
 // fakeFill is a simple test standin for fzgen/fuzzer.Fuzzer.Fill.
 // must take pointer to value of interest. For example, to fill an int:
-//     var a int
-//     fakeFill(&a)
+//
+//	var a int
+//	fakeFill(&a)
 func fakeFill(args ...interface{}) {
 	for _, obj := range args {
 		answer := 42

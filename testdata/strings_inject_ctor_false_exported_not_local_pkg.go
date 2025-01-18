@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_Builder_Cap(f *testing.F) {

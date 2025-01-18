@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	fuzzwrapexamples "github.com/thepudds/fzgen/examples/inputs/test-types"
-	"github.com/thepudds/fzgen/fuzzer"
+	fuzzwrapexamples "github.com/BelehovEgor/fzgen/examples/inputs/test-types"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewTypesNilCheck_Chain(f *testing.F) {

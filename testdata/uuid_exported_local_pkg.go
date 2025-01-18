@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewFromBytes_Chain(f *testing.F) {
