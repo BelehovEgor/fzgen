@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_CorruptInputError_Error(f *testing.F) {

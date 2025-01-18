@@ -137,7 +137,7 @@ package outer
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_OuterInt_Foo(f *testing.F) {
@@ -156,7 +156,7 @@ package inner1
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_InnerInt1_Foo(f *testing.F) {
@@ -175,7 +175,7 @@ package inner2
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_InnerInt2_Foo(f *testing.F) {
@@ -194,7 +194,7 @@ package outer
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_New_Chain(f *testing.F) {
@@ -222,7 +222,7 @@ package inner1
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_New_Chain(f *testing.F) {
@@ -250,7 +250,7 @@ package inner2
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_New_Chain(f *testing.F) {
@@ -279,7 +279,7 @@ import (
 	"example/inner1"
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_InnerInt1_Foo(f *testing.F) {
@@ -299,7 +299,7 @@ import (
 	"example/inner1"
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_InnerInt1_Foo(f *testing.F) {

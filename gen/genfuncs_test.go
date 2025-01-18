@@ -37,7 +37,7 @@ func TestTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			pkgPattern := "github.com/thepudds/fzgen/examples/inputs/test-types"
+			pkgPattern := "github.com/BelehovEgor/fzgen/examples/inputs/test-types"
 			options := flagExcludeFuzzPrefix | flagMultiMatch
 			if tt.onlyExported {
 				options |= flagRequireExported
@@ -113,7 +113,7 @@ func TestConstructorInjection(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			pkgPattern := "github.com/thepudds/fzgen/examples/inputs/test-constructor-injection"
+			pkgPattern := "github.com/BelehovEgor/fzgen/examples/inputs/test-constructor-injection"
 			options := flagExcludeFuzzPrefix | flagMultiMatch
 			if tt.onlyExported {
 				options |= flagRequireExported
@@ -199,7 +199,7 @@ func TestExported(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			pkgPattern := "github.com/thepudds/fzgen/examples/inputs/test-exported"
+			pkgPattern := "github.com/BelehovEgor/fzgen/examples/inputs/test-exported"
 			options := flagExcludeFuzzPrefix | flagMultiMatch
 			if tt.onlyExported {
 				options |= flagRequireExported

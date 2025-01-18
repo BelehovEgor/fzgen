@@ -6,8 +6,8 @@
 # Set up a usable module, including the run time dependency for fzgen/fuzzer
 # Note: we force use of our local copy of fzgen via a 'replace' directive.
 go mod init temp
-go mod edit -replace github.com/thepudds/fzgen=$FZLOCALDIR
-go get github.com/thepudds/fzgen/fuzzer
+go mod edit -replace github.com/BelehovEgor/fzgen=$FZLOCALDIR
+go get github.com/BelehovEgor/fzgen/fuzzer
 go list -m all
 
 # Add the filch package from tailscale.com

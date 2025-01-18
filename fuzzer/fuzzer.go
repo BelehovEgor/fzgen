@@ -8,7 +8,7 @@
 //
 // See the project README for additional information:
 //
-//	https://github.com/thepudds/fzgen
+//	https://github.com/BelehovEgor/fzgen
 package fuzzer
 
 import (
@@ -21,9 +21,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/randparam"
 	"github.com/sanity-io/litter"
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
-	"github.com/thepudds/fzgen/fuzzer/internal/randparam"
 )
 
 // SupportedInterfaces enumerates interfaces that can be filled by Fill(&obj).

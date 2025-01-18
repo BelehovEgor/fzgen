@@ -6,17 +6,20 @@ package fuzzer
 import (
 	"testing"
 
-	raceexample "github.com/thepudds/fzgen/examples/inputs/race"
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
+	raceexample "github.com/BelehovEgor/fzgen/examples/inputs/race"
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 )
 
 // TODO: need to update this for new encoding -- all zero draw now ==> sequential, so no race
 
 // These go test invocations are expected to crash with a race detector violation:
-//     go test -run=SimpleRace/parallel -v -race
-//     go test -run=SimpleRace -v -race
+//
+//	go test -run=SimpleRace/parallel -v -race
+//	go test -run=SimpleRace -v -race
+//
 // This should not crash:
-//     go test -run=SimpleRace/sequential -v -race
+//
+//	go test -run=SimpleRace/sequential -v -race
 func TestFuzzerChainWithSimpleRace(t *testing.T) {
 	tests := []struct {
 		name string
@@ -98,10 +101,13 @@ func TestFuzzerChainWithSimpleRace(t *testing.T) {
 }
 
 // These are expected to crash when run with the race detector:
-//     go test -run=ComplexRace/parallel -v -race
-//     go test -run=ComplexRace -v -race
+//
+//	go test -run=ComplexRace/parallel -v -race
+//	go test -run=ComplexRace -v -race
+//
 // This should not crash:
-//     go test -run=ComplexRace/sequential -v -race
+//
+//	go test -run=ComplexRace/sequential -v -race
 func TestFuzzerChainWithComplexRace(t *testing.T) {
 	tests := []struct {
 		name string
@@ -163,7 +169,7 @@ func TestFuzzerChainWithComplexRace(t *testing.T) {
 			fz := NewFuzzer([]byte{})
 
 			// target and steps here taken from:
-			//    fzgen -chain -pkg=github.com/thepudds/fzgen/examples/inputs/race
+			//    fzgen -chain -pkg=github.com/BelehovEgor/fzgen/examples/inputs/race
 			target := raceexample.NewMySafeMap()
 
 			steps := []Step{

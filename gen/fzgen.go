@@ -3,7 +3,7 @@
 //
 // See the project README for additional information:
 //
-//	https://github.com/thepudds/fzgen
+//	https://github.com/BelehovEgor/fzgen
 package gen
 
 import (

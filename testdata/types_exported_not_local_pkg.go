@@ -7,8 +7,8 @@ import (
 	"testing"
 	"unsafe"
 
-	fuzzwrapexamples "github.com/thepudds/fzgen/examples/inputs/test-types"
-	"github.com/thepudds/fzgen/fuzzer"
+	fuzzwrapexamples "github.com/BelehovEgor/fzgen/examples/inputs/test-types"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_TypesNilCheck_Interface(f *testing.F) {

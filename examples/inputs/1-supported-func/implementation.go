@@ -3,7 +3,7 @@ package supportedfunc
 import (
 	"fmt"
 
-	subpackage "github.com/thepudds/fzgen/examples/inputs/1-supported-func/sub-package"
+	subpackage "github.com/BelehovEgor/fzgen/examples/inputs/1-supported-func/sub-package"
 )
 
 type EmitFunc func(lvl int, format string, args ...interface{})

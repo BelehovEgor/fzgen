@@ -3,8 +3,8 @@ package examplefuzz
 import (
 	"testing"
 
-	raceexample "github.com/thepudds/fzgen/examples/inputs/race"
-	"github.com/thepudds/fzgen/fuzzer"
+	raceexample "github.com/BelehovEgor/fzgen/examples/inputs/race"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewMySafeMap_Chain(f *testing.F) {

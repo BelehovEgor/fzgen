@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/RoaringBitmap/roaring"
-	"github.com/thepudds/fzgen/fuzzer"
 )
 
 func Fuzz_NewBitmap_Chain(f *testing.F) {

@@ -3,7 +3,7 @@ package examplefuzz
 import (
 	"testing"
 
-	"github.com/thepudds/fzgen/fuzzer"
+	"github.com/BelehovEgor/fzgen/fuzzer"
 )
 
 func Fuzz_NewMySafeMap_Chain(f *testing.F) {

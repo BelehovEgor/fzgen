@@ -19,7 +19,7 @@ stdout 'go version.*go1\.(1[8-9]|[2-9][0-9]|[1-9][0-9][0-9])'
 exec git clone --depth 1 -b v1.1.2 https://github.com/hashicorp/terraform
 cd terraform
 exec gotip mod tidy
-exec gotip get github.com/thepudds/fzgen/fuzzer
+exec gotip get github.com/BelehovEgor/fzgen/fuzzer
 exec gotip get -d ./...
 fzgen -chain -ctor=. ./...
 stdout 'fzgen: created 37 files'

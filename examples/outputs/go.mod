@@ -6,15 +6,15 @@ module example
 go 1.18
 
 replace (
-	github.com/thepudds/fzgen => ./../..
-	github.com/thepudds/fzgen/examples/inputs/race-xsync-map => ./../../examples/inputs/race-xsync-map
+	github.com/BelehovEgor/fzgen => ./../..
+	github.com/BelehovEgor/fzgen/examples/inputs/race-xsync-map => ./../../examples/inputs/race-xsync-map
 )
 
 require (
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/google/uuid v1.3.0
-	github.com/thepudds/fzgen v0.0.0-00010101000000-000000000000
-	github.com/thepudds/fzgen/examples/inputs/race-xsync-map v0.0.0-00010101000000-000000000000
+	github.com/BelehovEgor/fzgen v0.0.0-00010101000000-000000000000
+	github.com/BelehovEgor/fzgen/examples/inputs/race-xsync-map v0.0.0-00010101000000-000000000000
 )
 
 require (

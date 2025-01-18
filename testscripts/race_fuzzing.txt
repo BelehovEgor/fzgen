@@ -1,5 +1,5 @@
 # Test end-to-end fuzzing. This test focuses on data race detection via return reuse in fz.Chain.
-# See github.com/thepudds/fzgen/examples/inputs/race for comments about target.
+# See github.com/BelehovEgor/fzgen/examples/inputs/race for comments about target.
 # Requires -end2end flag for 'go test'.
 #
 # Some test details:
@@ -20,12 +20,12 @@ stdout 'go version.*go1\.(1[8-9]|[2-9][0-9]|[1-9][0-9][0-9])'
 # Set up a usable module, including the run time dependency for fzgen/fuzzer
 # Note: we force use of our local copy of fzgen via a 'replace' directive.
 go mod init temp
-go mod edit -replace github.com/thepudds/fzgen=$FZLOCALDIR
-go get github.com/thepudds/fzgen/fuzzer
+go mod edit -replace github.com/BelehovEgor/fzgen=$FZLOCALDIR
+go get github.com/BelehovEgor/fzgen/fuzzer
 go list -m all
 
 # Create our set of wrappers, which will be chainable.
-fzgen -chain -parallel github.com/thepudds/fzgen/examples/inputs/race
+fzgen -chain -parallel github.com/BelehovEgor/fzgen/examples/inputs/race
 exists autofuzzchain_test.go
 
 # TODO: consider making the cmd/go fuzzing deterministic with -parallel=1,

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	raceexample "github.com/BelehovEgor/fzgen/examples/inputs/race"
+	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 	"github.com/google/go-cmp/cmp"
-	raceexample "github.com/thepudds/fzgen/examples/inputs/race"
-	"github.com/thepudds/fzgen/fuzzer/internal/plan"
 )
 
 func TestUnmarshalPlan(t *testing.T) {
@@ -117,7 +117,7 @@ func TestUnmarshalPlan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// target and steps here taken from:
-			//    fzgen -chain -pkg=github.com/thepudds/fzgen/examples/inputs/race
+			//    fzgen -chain -pkg=github.com/BelehovEgor/fzgen/examples/inputs/race
 			target := raceexample.NewMySafeMap()
 
 			steps := []Step{

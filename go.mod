@@ -1,4 +1,4 @@
-module github.com/thepudds/fzgen
+module github.com/BelehovEgor/fzgen
 
 go 1.18
 
