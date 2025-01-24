@@ -57,3 +57,20 @@ func (f *Func) Params() []*types.Var {
 	}
 	return inputParams
 }
+
+func (f *Func) Receiver() *types.Named {
+	sig := f.GetSignature()
+
+	// Get our receiver, which might be nil if we don't have a receiver
+	recv := sig.Recv()
+	if recv == nil {
+		return nil
+	}
+
+	n, err := namedType(recv)
+	if err != nil {
+		return nil
+	}
+
+	return n
+}

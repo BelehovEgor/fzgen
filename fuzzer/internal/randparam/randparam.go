@@ -267,7 +267,12 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	}
 
 	if len(res) == 1 {
-		reflectValue.Set(res[0])
+		resN := res[0]
+		if resN.Kind() == reflect.Ptr {
+			reflectValue.Set(resN.Elem())
+		} else {
+			reflectValue.Set(resN)
+		}
 	}
 
 	if isFirstInterfaceInStack {
@@ -695,11 +700,18 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 	case reflect.Struct:
 		typeName := v.Type().String()
 		_, has := f.typeFabricMap[typeName]
+		var createStructUsingConstructor bool
 
 		if has {
-			var createStructUsingConstructor bool
-			return f.Fill2(&createStructUsingConstructor)
-		} else {
+			f.Fill(&createStructUsingConstructor)
+
+			if createStructUsingConstructor {
+				err := f.fillUsingFabric(v, 0, opts)
+				return err
+			}
+		}
+
+		if !has || !createStructUsingConstructor {
 			for i := 0; i < v.NumField(); i++ {
 				if v.Field(i).CanSet() {
 					// TODO: could consider option for unexported fields

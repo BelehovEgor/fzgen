@@ -122,8 +122,7 @@ func GenerateInitTestFunc(
 			continue
 		}
 
-		sig := constructor.Func.GetSignature()
-		returnType := types.TypeString(sig.Results().At(0).Type(), qualifier.Qualifier)
+		returnType := types.TypeString(constructor.ReturnType, qualifier.Qualifier)
 
 		emit(
 			"FabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",

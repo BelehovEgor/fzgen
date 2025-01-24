@@ -15,6 +15,7 @@ import (
 type wrapperOptions struct {
 	qualifyAll bool   // qualify all variables with package name
 	topComment string // additional comment for top of generated file.
+	parallel   bool
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -131,7 +132,8 @@ func emitIndependentWrapper(
 	emit emitFunc,
 	function mod.Func,
 	typeContext *mod.TypeContext,
-	qualifier *mod.ImportQualifier) error {
+	qualifier *mod.ImportQualifier,
+) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
@@ -185,11 +187,6 @@ func emitIndependentWrapper(
 	isSupported := true
 	var unsupportedParam *types.Var
 	for _, v := range inputParams {
-		if v.Type().String() == "func(net/http.ResponseWriter, *net/http.Request)" {
-			i := 1
-			i++
-		}
-
 		if !typeContext.IsSupported(v.Type()) {
 			isSupported = false
 			unsupportedParam = v
