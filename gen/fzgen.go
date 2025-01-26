@@ -65,6 +65,8 @@ func FzgenMain() int {
 	}
 
 	// Most commonly used:
+	chainFlag := flag.Bool("chain", false, "loop over the methods of an object, which requires finding a suitable constructor in the same package and which is controllable via the -ctor flag.")
+	parallelFlag := flag.Bool("parallel", false, "indicates an emitted chain can be run in parallel. requires -chain")
 	outFileFlag := flag.String("o", "autofuzz_test.go", "output file name. defaults to autofuzz_test.go or autofuzzchain_test.go")
 	constructorPatternFlag := flag.String("ctor", ".", "regexp to use if searching for constructors to automatically use.")
 
@@ -91,6 +93,16 @@ func FzgenMain() int {
 	if !*unexportedFlag {
 		options |= flagRequireExported
 	}
+
+	if *parallelFlag && !*chainFlag {
+		fmt.Fprint(os.Stderr, "fzgen: -parallel flag requires -chain\n")
+		return 2
+	}
+
+	if *chainFlag && *outFileFlag == "autofuzz_test.go" {
+		*outFileFlag = "autofuzzchain_test.go"
+	}
+
 	analyzeResult, err := findFuncsGrouped(pkgPattern, *funcPatternFlag, *constructorPatternFlag, options)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fzgen: %v\n", err)
@@ -169,7 +181,12 @@ func FzgenMain() int {
 		}
 
 		// Do the actual work of emitting our wrappers.
-		out, err := emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+		var out []byte
+		if !*chainFlag {
+			out, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+		} else {
+			out, err = emitChainWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+		}
 
 		// Handle certain common errors gracefully, including skipping & continuing if multiple target packages.
 		if err != nil {

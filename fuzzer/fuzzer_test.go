@@ -62,7 +62,7 @@ func TestCallStep(t *testing.T) {
 			}
 
 			allowReturnValReuse := true
-			args := fz.prepareStep(&ec, allowReturnValReuse, fakeFill)
+			args, _ := fz.prepareStep(&ec, allowReturnValReuse, fakeFill)
 			ec.args = args
 
 			ret := fz.callStep(ec)
@@ -210,7 +210,7 @@ func TestFuzzerChain(t *testing.T) {
 //
 //	var a int
 //	fakeFill(&a)
-func fakeFill(args ...interface{}) {
+func fakeFill(args ...interface{}) error {
 	for _, obj := range args {
 		answer := 42
 		switch v := obj.(type) {
@@ -228,6 +228,8 @@ func fakeFill(args ...interface{}) {
 			panic(fmt.Sprintf("unsupported type in fakeFill: %T %v", obj, obj))
 		}
 	}
+
+	return nil
 }
 
 func TestFuzzerFill(t *testing.T) {

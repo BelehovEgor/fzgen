@@ -15,6 +15,7 @@ import (
 type wrapperOptions struct {
 	qualifyAll bool   // qualify all variables with package name
 	topComment string // additional comment for top of generated file.
+	parallel   bool
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -75,7 +76,7 @@ func emitIndependentWrappers(
 	var success bool
 	for _, function := range pkgFuncs.Targets {
 		err := emitIndependentWrapper(
-			emit, *function, typeContext, qualifier)
+			emit, function, typeContext, qualifier)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -129,9 +130,10 @@ func newParam(v *types.Var, varContext *mod.VariablesContext, qualifier types.Qu
 // qualifyAll indicates if all variables should be qualified with their package.
 func emitIndependentWrapper(
 	emit emitFunc,
-	function mod.Func,
+	function *mod.Func,
 	typeContext *mod.TypeContext,
-	qualifier *mod.ImportQualifier) error {
+	qualifier *mod.ImportQualifier,
+) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
@@ -185,11 +187,6 @@ func emitIndependentWrapper(
 	isSupported := true
 	var unsupportedParam *types.Var
 	for _, v := range inputParams {
-		if v.Type().String() == "func(net/http.ResponseWriter, *net/http.Request)" {
-			i := 1
-			i++
-		}
-
 		if !typeContext.IsSupported(v.Type()) {
 			isSupported = false
 			unsupportedParam = v
@@ -258,7 +255,7 @@ func emitFillResultCheck(emit emitFunc, fillErrorName string, allParams []*param
 // For example, a target set to "target" would result in "target.Load(key)".
 func emitWrappedFunc(
 	emit emitFunc,
-	f mod.Func,
+	f *mod.Func,
 	recv *paramRepr,
 	paramReprs []*paramRepr,
 	qualifier types.Qualifier,
@@ -277,7 +274,7 @@ func emitWrappedFunc(
 // based on collisions with package name or other parameters.
 func emitArgs(
 	emit emitFunc,
-	f mod.Func,
+	f *mod.Func,
 	paramReprs []*paramRepr,
 ) {
 	sig := f.GetSignature()
