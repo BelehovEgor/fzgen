@@ -26,9 +26,6 @@ import (
 	"github.com/sanity-io/litter"
 )
 
-// SupportedInterfaces enumerates interfaces that can be filled by Fill(&obj).
-var SupportedInterfaces = randparam.SupportedInterfaces
-
 // Step describes an operation to step the system forward.
 // Func can take any number of arguments and return any number of values.
 // The Name string conventionally should be an acceptable func identifier.
@@ -118,7 +115,6 @@ func (fz *Fuzzer) Fill(x ...interface{}) {
 }
 
 func (fz *Fuzzer) Fill2(x ...interface{}) error {
-	// TODO: probably panic if called from within Chain.
 	for _, arg := range x {
 		before := fz.randparamFuzzer.Remaining()
 
@@ -246,7 +242,7 @@ func ChainParallel(fz *Fuzzer) error {
 // If the last return value of a Step is of type error and a non-nil value is returned,
 // this indicates a sequence of Steps should stop execution,
 // The only current option is ChainOptParallel.
-func (fz *Fuzzer) Chain(steps []Step, options ...ChainOpt) {
+func (fz *Fuzzer) Chain(steps []Step, options ...ChainOpt) error {
 	// Start by filling in our plan, which will let us know the sequence of steps along
 	// with sources for input args (which might be re-using input args,
 	// or using return values, or new values from fz.Fill).
@@ -291,10 +287,10 @@ func (fz *Fuzzer) Chain(steps []Step, options ...ChainOpt) {
 		}
 	}
 
-	fz.chain(steps, pl)
+	return fz.chain(steps, pl)
 }
 
-func (fz *Fuzzer) chain(steps []Step, pl plan.Plan) {
+func (fz *Fuzzer) chain(steps []Step, pl plan.Plan) error {
 	parallelAllowed := fz.chainOpts.parallel
 
 	// First, determine if we will spin and loop for any parallel calls.
@@ -326,7 +322,11 @@ func (fz *Fuzzer) chain(steps []Step, pl plan.Plan) {
 		allowReturnValReuse := loopCount == 1
 		// Build arguments for this call, and also get its reflect.Value function.
 		// This can update the execCall to track outputSlots.
-		args := fz.prepareStep(&execCalls[i], allowReturnValReuse, fz.Fill)
+		args, err := fz.prepareStep(&execCalls[i], allowReturnValReuse, fz.Fill2)
+		if err != nil {
+			// skip this step
+			return err
+		}
 
 		// Track what we need to execute this call later.
 		execCalls[i].args = args
@@ -421,6 +421,8 @@ func (fz *Fuzzer) chain(steps []Step, pl plan.Plan) {
 			}
 		}
 	}
+
+	return nil
 }
 
 // calcParallelControl draws and interprets bytes to control our spinning and looping.
@@ -594,7 +596,7 @@ func (fz *Fuzzer) callStep(ec execCall) []reflect.Value {
 	return ret
 }
 
-func (fz *Fuzzer) prepareStep(ec *execCall, allowReturnValReuse bool, fillFunc func(...interface{})) []argument {
+func (fz *Fuzzer) prepareStep(ec *execCall, allowReturnValReuse bool, fillFunc func(...interface{}) error) ([]argument, error) {
 	// TODO: additional sanity checking on types?
 	fv := ec.fv
 	ft := fv.Type()
@@ -661,7 +663,10 @@ func (fz *Fuzzer) prepareStep(ec *execCall, allowReturnValReuse bool, fillFunc f
 			inIntf := inV.Interface()
 
 			// Do the work of filling in this value
-			fillFunc(inIntf)
+			err := fillFunc(inIntf)
+			if err != nil {
+				return args, err
+			}
 
 			inElem := inV.Elem()
 			arg = argument{
@@ -707,7 +712,7 @@ func (fz *Fuzzer) prepareStep(ec *execCall, allowReturnValReuse bool, fillFunc f
 		}
 	}
 
-	return args
+	return args, nil
 }
 
 func mustFunc(obj interface{}) reflect.Value {

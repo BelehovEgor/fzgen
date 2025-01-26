@@ -11,7 +11,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/fzgen/main.go",
             "args": [
-                "github.com/BelehovEgor/fzgen/examples/inputs/test-constructor-injection"
+                "net/http"
             ]
         }
     ]

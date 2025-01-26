@@ -76,7 +76,7 @@ func emitIndependentWrappers(
 	var success bool
 	for _, function := range pkgFuncs.Targets {
 		err := emitIndependentWrapper(
-			emit, *function, typeContext, qualifier)
+			emit, function, typeContext, qualifier)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -130,7 +130,7 @@ func newParam(v *types.Var, varContext *mod.VariablesContext, qualifier types.Qu
 // qualifyAll indicates if all variables should be qualified with their package.
 func emitIndependentWrapper(
 	emit emitFunc,
-	function mod.Func,
+	function *mod.Func,
 	typeContext *mod.TypeContext,
 	qualifier *mod.ImportQualifier,
 ) error {
@@ -255,7 +255,7 @@ func emitFillResultCheck(emit emitFunc, fillErrorName string, allParams []*param
 // For example, a target set to "target" would result in "target.Load(key)".
 func emitWrappedFunc(
 	emit emitFunc,
-	f mod.Func,
+	f *mod.Func,
 	recv *paramRepr,
 	paramReprs []*paramRepr,
 	qualifier types.Qualifier,
@@ -274,7 +274,7 @@ func emitWrappedFunc(
 // based on collisions with package name or other parameters.
 func emitArgs(
 	emit emitFunc,
-	f mod.Func,
+	f *mod.Func,
 	paramReprs []*paramRepr,
 ) {
 	sig := f.GetSignature()

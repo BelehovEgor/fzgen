@@ -22,29 +22,6 @@ import (
 	"reflect"
 )
 
-// SupportedInterfaces enumerates interfaces that can be filled by Fill(&obj).
-var SupportedInterfaces = map[string]bool{
-	"io.Writer":       true,
-	"io.Reader":       true,
-	"io.ReaderAt":     true,
-	"io.WriterTo":     true,
-	"io.Seeker":       true,
-	"io.ByteScanner":  true,
-	"io.RuneScanner":  true,
-	"io.ReadSeeker":   true,
-	"io.ByteReader":   true,
-	"io.RuneReader":   true,
-	"io.ByteWriter":   true,
-	"io.ReadWriter":   true,
-	"io.ReaderFrom":   true,
-	"io.StringWriter": true,
-	"io.Closer":       true,
-	"io.ReadCloser":   true,
-	"context.Context": true,
-	"error":           true,
-	"interface{}":     true,
-}
-
 // Fuzzer generates random values for public members.
 // It allows wiring together cmd/go fuzzing or dvyukov/go-fuzz (for randomness, instrumentation, managing corpus, etc.)
 // with the ability to fill in common interfaces, as well as string, []byte, and number values.
