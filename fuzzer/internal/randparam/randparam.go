@@ -219,12 +219,9 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	countUnused := int8(len(unusedFabrics))
 
 	// chouse specific fabric
-	var numberOfFabric int8
+	var numberOfFabric byte
 	f.Fill(&numberOfFabric)
-	if numberOfFabric < 1 {
-		numberOfFabric *= -1
-	}
-	fn := unusedFabrics[numberOfFabric%countUnused]
+	fn := unusedFabrics[int8(numberOfFabric)%countUnused]
 	f.used[fn] = true
 	fnType := fn.Type()
 
@@ -273,15 +270,12 @@ func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
 		return false
 	}
 
-	//count := int8(len(fabrics))
+	count := int8(len(fabrics))
 
 	// chouse specific fabric
-	var numberOfFabric int8
+	var numberOfFabric byte
 	f.Fill(&numberOfFabric)
-	if numberOfFabric < 1 {
-		numberOfFabric *= -1
-	}
-	fn := fabrics[numberOfFabric]
+	fn := fabrics[int8(numberOfFabric)%count]
 	fnType := fn.Type()
 
 	args := make([]reflect.Value, fnType.NumIn())
