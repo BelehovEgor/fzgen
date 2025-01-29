@@ -125,7 +125,7 @@ func emitChainWrappers(
 
 	funcs := make([]*mod.GeneratedFunc, 0, len(fabrics))
 	for _, value := range fabrics {
-		funcs = append(funcs, value)
+		funcs = append(funcs, value...)
 	}
 	sort.Slice(funcs, func(i, j int) bool {
 		return funcs[i].Name > funcs[j].Name

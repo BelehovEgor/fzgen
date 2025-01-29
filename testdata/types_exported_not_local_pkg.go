@@ -308,22 +308,16 @@ func Fuzz_TypesShortListSkip2(f *testing.F) {
 	})
 }
 
-func fabric_interface_empty(
-	num int,
-	typesnilcheck fuzzwrapexamples.TypesNilCheck,
-	std fuzzwrapexamples.Std,
-	mystruct fuzzwrapexamples.MyStruct,
-) interface{} {
-	switch num % 3 {
-	case 0:
-		return typesnilcheck
-	case 1:
-		return std
-	case 2:
-		return mystruct
-	default:
-		panic("unreachable")
-	}
+func fabric_interface_empty_TypesNilCheck(impl fuzzwrapexamples.TypesNilCheck) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_Std(impl fuzzwrapexamples.Std) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_MyStruct(impl fuzzwrapexamples.MyStruct) interface{} {
+	return impl
 }
 
 func fabric_func_21_0() func(int) {
@@ -334,8 +328,10 @@ var FabricFuncsForCustomTypes map[string][]reflect.Value
 
 func TestMain(m *testing.M) {
 	FabricFuncsForCustomTypes = make(map[string][]reflect.Value)
-	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_TypesNilCheck))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_Std))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_MyStruct))
 	FabricFuncsForCustomTypes["func(int)"] = append(FabricFuncsForCustomTypes["func(int)"], reflect.ValueOf(fabric_func_21_0))
-	FabricFuncsForCustomTypes["*fuzzwrapexamples.TypesNilCheck"] = append(FabricFuncsForCustomTypes["*fuzzwrapexamples.TypesNilCheck"], reflect.ValueOf(fuzzwrapexamples.NewTypesNilCheck))
+	FabricFuncsForCustomTypes["fuzzwrapexamples.TypesNilCheck"] = append(FabricFuncsForCustomTypes["fuzzwrapexamples.TypesNilCheck"], reflect.ValueOf(fuzzwrapexamples.NewTypesNilCheck))
 	m.Run()
 }
