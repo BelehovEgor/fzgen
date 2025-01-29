@@ -175,42 +175,44 @@ func Fuzz_NewZ(f *testing.F) {
 	})
 }
 
-func fabric_interface_empty(
-	num int,
-	z Z,
-	package_0 Package,
-	myregexp MyRegexp,
-	mynulluuid MyNullUUID,
-	b B,
-	a A,
-) interface{} {
-	switch num % 6 {
-	case 0:
-		return z
-	case 1:
-		return package_0
-	case 2:
-		return myregexp
-	case 3:
-		return mynulluuid
-	case 4:
-		return b
-	case 5:
-		return a
-	default:
-		panic("unreachable")
-	}
+func fabric_interface_empty_Z(impl Z) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_Package(impl Package) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_MyRegexp(impl MyRegexp) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_MyNullUUID(impl MyNullUUID) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_B(impl B) interface{} {
+	return impl
+}
+
+func fabric_interface_empty_A(impl A) interface{} {
+	return impl
 }
 
 var FabricFuncsForCustomTypes map[string][]reflect.Value
 
 func TestMain(m *testing.M) {
 	FabricFuncsForCustomTypes = make(map[string][]reflect.Value)
-	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty))
-	FabricFuncsForCustomTypes["*Z"] = append(FabricFuncsForCustomTypes["*Z"], reflect.ValueOf(NewZ))
-	FabricFuncsForCustomTypes["*Package"] = append(FabricFuncsForCustomTypes["*Package"], reflect.ValueOf(NewPackage))
-	FabricFuncsForCustomTypes["*MyRegexp"] = append(FabricFuncsForCustomTypes["*MyRegexp"], reflect.ValueOf(NewMyRegexp))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_Z))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_Package))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_MyRegexp))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_MyNullUUID))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_B))
+	FabricFuncsForCustomTypes["interface {}"] = append(FabricFuncsForCustomTypes["interface {}"], reflect.ValueOf(fabric_interface_empty_A))
+	FabricFuncsForCustomTypes["Z"] = append(FabricFuncsForCustomTypes["Z"], reflect.ValueOf(NewZ))
+	FabricFuncsForCustomTypes["Package"] = append(FabricFuncsForCustomTypes["Package"], reflect.ValueOf(NewPackage))
+	FabricFuncsForCustomTypes["MyRegexp"] = append(FabricFuncsForCustomTypes["MyRegexp"], reflect.ValueOf(NewMyRegexp))
 	FabricFuncsForCustomTypes["B"] = append(FabricFuncsForCustomTypes["B"], reflect.ValueOf(NewBVal))
-	FabricFuncsForCustomTypes["*A"] = append(FabricFuncsForCustomTypes["*A"], reflect.ValueOf(NewAPtr))
+	FabricFuncsForCustomTypes["A"] = append(FabricFuncsForCustomTypes["A"], reflect.ValueOf(NewAPtr))
 	m.Run()
 }

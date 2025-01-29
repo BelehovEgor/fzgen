@@ -141,6 +141,7 @@ func TestConstructorInjection(t *testing.T) {
 			}
 
 			got := string(out)
+			print(got)
 			if *updateFlag {
 				// Note: using Fatalf above including so that we don't update if there was an earlier failure.
 				err = ioutil.WriteFile(golden, []byte(got), 0o644)
