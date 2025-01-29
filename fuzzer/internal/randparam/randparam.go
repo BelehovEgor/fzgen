@@ -216,12 +216,12 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 
 		return fmt.Errorf("type %s is not supported", typeName)
 	}
-	countUnused := int8(len(unusedFabrics))
+	countUnused := int32(len(unusedFabrics))
 
 	// chouse specific fabric
 	var numberOfFabric byte
 	f.Fill(&numberOfFabric)
-	fn := unusedFabrics[int8(numberOfFabric)%countUnused]
+	fn := unusedFabrics[int32(numberOfFabric)%countUnused]
 	f.used[fn] = true
 	fnType := fn.Type()
 
@@ -270,12 +270,12 @@ func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
 		return false
 	}
 
-	count := int8(len(fabrics))
+	count := int32(len(fabrics))
 
 	// chouse specific fabric
 	var numberOfFabric byte
 	f.Fill(&numberOfFabric)
-	fn := fabrics[int8(numberOfFabric)%count]
+	fn := fabrics[int32(numberOfFabric)%count]
 	fnType := fn.Type()
 
 	args := make([]reflect.Value, fnType.NumIn())
