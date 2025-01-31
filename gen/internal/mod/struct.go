@@ -22,32 +22,26 @@ func (s *Struct) TypeString(qualifier types.Qualifier) string {
 	return types.TypeString(s.TypesNamed, qualifier)
 }
 
-func (s *Struct) GetNotNativeTypes() map[*types.Var]bool {
+func (s *Struct) GetNotNativeTypes() map[types.Type]bool {
 	return getNotNativeTypes(s.TypesStruct, 1)
 }
 
-func getNotNativeTypes(s *types.Struct, depth int) map[*types.Var]bool {
+func getNotNativeTypes(s *types.Struct, depth int) map[types.Type]bool {
 	if depth > maxDepth {
 		return nil
 	}
 
-	notNative := make(map[*types.Var]bool)
+	notNatives := make(map[types.Type]bool)
 	for i := 0; i < s.NumFields(); i++ {
 		field := s.Field(i)
-		switch u := field.Type().Underlying().(type) {
-		case *types.Interface, *types.Signature:
-			notNative[field] = true
-		case *types.Struct:
-			fieldNotNative := getNotNativeTypes(u, depth+1)
-			if fieldNotNative == nil {
-				continue
-			}
 
-			for v := range fieldNotNative {
-				notNative[v] = true
+		complex := getNamedOrSignatureTypes(field.Type())
+		if len(complex) > 0 {
+			for _, notNative := range complex {
+				notNatives[notNative] = true
 			}
 		}
 	}
 
-	return notNative
+	return notNatives
 }

@@ -38,46 +38,55 @@ func GenerateFabrics(
 
 	for i, target := range targets {
 		for j, param := range target.Params() {
-			switch u := param.Type().Underlying().(type) {
-			case *types.Interface:
-				if funcs := createFabricOfInterfaces(param, qualifier, supportedInterfaces); funcs != nil {
-					generated[types.TypeString(u, qualifier.Qualifier)] = funcs
-					typeContext.AddType(param.Type())
-				}
-			case *types.Struct:
-				for notNativeType := range getNotNativeTypes(u, 1) {
-					switch t := notNativeType.Type().Underlying().(type) {
-					case *types.Interface:
-						if funcs := createFabricOfInterfaces(
-							notNativeType,
-							qualifier,
-							supportedInterfaces,
-						); funcs != nil {
-							generated[types.TypeString(t, qualifier.Qualifier)] = funcs
-							typeContext.AddType(t)
-						}
-					case *types.Signature:
-						if f := createFabricOfFuncs(
-							t,
-							fmt.Sprintf("%d_%d", i, j),
-							qualifier,
-							existedFuncs,
-						); f != nil {
-							generated[types.TypeString(t, qualifier.Qualifier)] = append(generated[types.TypeString(t, qualifier.Qualifier)], f)
-							typeContext.AddType(t)
+			baseTypes := getNamedOrSignatureTypes(param.Type())
+			for _, baseType := range baseTypes {
+				switch u := baseType.Underlying().(type) {
+				case *types.Interface:
+					if funcs := createFabricOfInterfaces(baseType, qualifier, supportedInterfaces); funcs != nil {
+						generated[types.TypeString(baseType, qualifier.Qualifier)] = funcs
+						typeContext.AddType(baseType)
+					}
+				case *types.Struct:
+					for notNativeType := range getNotNativeTypes(u, 1) {
+						switch t := notNativeType.(type) {
+						case *types.Interface:
+							if funcs := createFabricOfInterfaces(
+								t,
+								qualifier,
+								supportedInterfaces,
+							); funcs != nil {
+								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
+								typeContext.AddType(t)
+							}
+						case *types.Signature:
+							if f := createFabricOfFuncs(
+								t,
+								fmt.Sprintf("%d_%d", i, j),
+								qualifier,
+								existedFuncs,
+							); f != nil {
+								generated[types.TypeString(t, qualifier.Qualifier)] = append(
+									generated[types.TypeString(t, qualifier.Qualifier)],
+									f,
+								)
+								typeContext.AddType(t)
+							}
 						}
 					}
-				}
-			case *types.Signature:
-				if f := createFabricOfFuncs(
-					u,
-					fmt.Sprintf("%d_%d", i, j),
-					qualifier,
-					existedFuncs,
-				); f != nil {
-					generated[types.TypeString(u, qualifier.Qualifier)] = append(generated[types.TypeString(u, qualifier.Qualifier)], f)
+				case *types.Signature:
+					if f := createFabricOfFuncs(
+						u,
+						fmt.Sprintf("%d_%d", i, j),
+						qualifier,
+						existedFuncs,
+					); f != nil {
+						generated[types.TypeString(u, qualifier.Qualifier)] = append(
+							generated[types.TypeString(u, qualifier.Qualifier)],
+							f,
+						)
 
-					typeContext.AddType(param.Type())
+						typeContext.AddType(param.Type())
+					}
 				}
 			}
 		}
@@ -196,11 +205,11 @@ func createFabricOfEmptyInterface(
 }
 
 func createFabricOfInterfaces(
-	v *types.Var,
+	t types.Type,
 	qualifier *ImportQualifier,
 	supportedInterfaces map[string]*Interface,
 ) []*GeneratedFunc {
-	typeString := v.Type().String()
+	typeString := t.String()
 	supported, ok := supportedInterfaces[typeString]
 	if !ok {
 		return nil
