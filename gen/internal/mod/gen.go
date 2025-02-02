@@ -113,7 +113,7 @@ func GenerateInitTestFunc(
 
 		for _, f := range funcs {
 			emit(
-				"FabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",
+				"\tFabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",
 				f.ReturnType,
 				f.ReturnType,
 				f.Name,

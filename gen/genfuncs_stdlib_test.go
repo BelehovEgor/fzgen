@@ -62,11 +62,11 @@ func TestStrings(t *testing.T) {
 			wrapperOpts := wrapperOptions{
 				qualifyAll: tt.qualifyAll,
 			}
-			out, err := emitIndependentWrappers(pkgPattern, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
+			gen, err := emitIndependentWrappers(pkgPattern, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
-			out, err = imports.Process("autofuzz_test.go", out, nil)
+			out, err := imports.Process("autofuzz_test.go", gen.Tests, nil)
 			if err != nil {
 				t.Fatalf("imports.Process() failed: %v", err)
 			}

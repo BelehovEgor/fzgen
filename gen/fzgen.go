@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -73,6 +74,9 @@ func FzgenMain() int {
 	// Less commonly used:
 	funcPatternFlag := flag.String("func", ".", "function regex, defaults to matching all candidate functions")
 	unexportedFlag := flag.Bool("unexported", false, "emit wrappers for unexported functions in addition to exported functions")
+
+	// Mocks
+	mocksEnabled := flag.Bool("mocks", false, "generates mocks for all interfaces that can be argument of functions")
 
 	flag.Parse()
 
@@ -176,14 +180,19 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll: qualifyAll,
-			topComment: topComment,
+			qualifyAll:    qualifyAll,
+			topComment:    topComment,
+			requiredMocks: *mocksEnabled,
 		}
 
 		// Do the actual work of emitting our wrappers.
 		var out []byte
+		var yaml []byte
+		var gen *generated
 		if !*chainFlag {
-			out, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+			gen, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+			out = gen.Tests
+			yaml = gen.MockeryYaml
 		} else {
 			out, err = emitChainWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
 		}
@@ -194,7 +203,22 @@ func FzgenMain() int {
 		}
 		generatedFiles++
 
-		// Fix up any needed imports.
+		if yaml != nil {
+			err = os.WriteFile(fmt.Sprintf("%s/.mockery.yaml", outDir), yaml, 0o644)
+			if err != nil {
+				fail(err)
+			}
+
+			cmd := exec.Command("mockery")
+			cmd.Dir = outDir
+			_, err := cmd.Output()
+			if err != nil {
+				fmt.Println(err.Error())
+				fail(err)
+			}
+		}
+
+		//Fix up any needed imports.
 		var adjusted []byte
 		abs, err := filepath.Abs(outFile)
 		if err != nil {

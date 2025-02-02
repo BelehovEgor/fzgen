@@ -1,65 +1,44 @@
 package supportedinterface
 
-import (
-	"fmt"
-	"io"
-)
-
 type Printer interface {
-	Print(s string) int
+	Print(s string) (int, error)
+	PrintPrinter() int
 }
 
 type MyPrinter struct {
 }
 
-func (printer MyPrinter) Print(s string) int {
-	return len(s)
+func (printer MyPrinter) Print(s string) (int, error) {
+	return len(s), nil
 }
 
-type B struct {
-	I, J int
-	S    string
+func (printer MyPrinter) PrintPrinter() int {
+	return 1
 }
 
-type MyPointerPrinter struct {
-	B        B
-	I        int
-	Printer  Printer
-	Printer_ Printer
-	Printer2 MyPrinter
+func Do2() {
+	Do(MyPrinter{})
 }
 
-func (printer *MyPointerPrinter) Print(s string) int {
-	return len(s)
+func Do(printer Printer) {
+
 }
 
-type IInterface interface {
-	Do(printer Printer) bool
+type Emiter func(string) bool
+
+func MyEmiter(s string) bool {
+	return len(s) > 0
 }
 
-type A struct {
+type StructWithComplexField struct {
+	Printer Printer
+	Emit    Emiter
 }
 
-func (a A) Do(printer Printer) bool {
-	return true
+func Target(s StructWithComplexField) {
+
 }
 
-func NewA() A {
-	return A{}
-}
-
-func NewPointerA() (*A, error) {
-	return &A{}, nil
-}
-
-func newPointerA() (*A, error) {
-	return &A{}, nil
-}
-
-func NewComplexA(writer io.ByteReader) A {
-	return A{}
-}
-
-func MySubEmitter(lvl int, format string, args ...interface{}) {
-	fmt.Printf(format, args...)
+func NewMyPrinter() MyPrinter {
+	return MyPrinter{}
 }
