@@ -65,10 +65,10 @@ func GenerateFabrics(
 								qualifier,
 								existedFuncs,
 							); f != nil {
-								generated[types.TypeString(t, qualifier.Qualifier)] = append(
-									generated[types.TypeString(t, qualifier.Qualifier)],
-									f,
-								)
+								funcs := make([]*GeneratedFunc, 1)
+								funcs[0] = f
+
+								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
 								typeContext.AddType(t)
 							}
 						}
@@ -80,11 +80,10 @@ func GenerateFabrics(
 						qualifier,
 						existedFuncs,
 					); f != nil {
-						generated[types.TypeString(u, qualifier.Qualifier)] = append(
-							generated[types.TypeString(u, qualifier.Qualifier)],
-							f,
-						)
+						funcs := make([]*GeneratedFunc, 1)
+						funcs[0] = f
 
+						generated[types.TypeString(u, qualifier.Qualifier)] = funcs
 						typeContext.AddType(param.Type())
 					}
 				}
