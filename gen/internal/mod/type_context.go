@@ -66,6 +66,7 @@ func (tc *TypeContext) AddType(t types.Type) {
 
 func (tc *TypeContext) AddFunc(f *Func) {
 	tc.ExistedFuncs = append(tc.ExistedFuncs, f)
+	tc.tryAddAsConstructor(f)
 }
 
 func (tc *TypeContext) AddStruct(s *Struct) {
@@ -90,7 +91,7 @@ func (tc *TypeContext) AddInterface(i *Interface) {
 	}
 }
 
-func (tc *TypeContext) TryAddAsConstructor(f *Func) {
+func (tc *TypeContext) tryAddAsConstructor(f *Func) {
 	con := tryCastToConstructor(f)
 
 	if con == nil || !tc.constructorPattern.MatchString(con.Func.FuncName) {
@@ -289,4 +290,33 @@ func namedType(recv *types.Var) (*types.Named, error) {
 		return t, nil
 	}
 	return reportErr()
+}
+
+func getNamedOrSignatureTypes(t types.Type) []types.Type {
+	var result []types.Type
+
+	switch f := t.(type) {
+	case *types.Pointer:
+		return getNamedOrSignatureTypes(f.Elem())
+	case *types.Slice:
+		return getNamedOrSignatureTypes(f.Elem())
+	case *types.Array:
+		return getNamedOrSignatureTypes(f.Elem())
+	case *types.Map:
+		result = append(result, getNamedOrSignatureTypes(f.Elem())...)
+		result = append(result, getNamedOrSignatureTypes(f.Key())...)
+	case *types.Named:
+		switch f.Underlying().(type) {
+		case *types.Interface:
+			result = append(result, f)
+		case *types.Struct:
+			result = append(result, f)
+		case *types.Signature:
+			result = append(result, t)
+		}
+	case *types.Signature:
+		result = append(result, t)
+	}
+
+	return result
 }

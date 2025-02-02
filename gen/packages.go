@@ -192,7 +192,6 @@ func getPackageContent(
 			typeContext.AddFunc(&f)
 
 			addTarget(&targets, &f, funcPattern, flags)
-			typeContext.TryAddAsConstructor(&f)
 		}
 	}
 
