@@ -23,23 +23,36 @@ func (s *Struct) TypeString(qualifier types.Qualifier) string {
 }
 
 func (s *Struct) GetNotNativeTypes() map[types.Type]bool {
-	return getNotNativeTypes(s.TypesStruct, 1)
+	return getNotNativeTypes(s.TypesStruct, 0)
 }
 
 func getNotNativeTypes(s *types.Struct, depth int) map[types.Type]bool {
-	if depth > maxDepth {
-		return nil
+	notNatives := make(map[types.Type]bool)
+
+	if depth == maxDepth {
+		return notNatives
 	}
 
-	notNatives := make(map[types.Type]bool)
 	for i := 0; i < s.NumFields(); i++ {
 		field := s.Field(i)
 
 		complex := getNamedOrSignatureTypes(field.Type())
-		if len(complex) > 0 {
-			for _, notNative := range complex {
+		for _, notNative := range complex {
+			switch named := notNative.(type) {
+			case *types.Named:
+				switch u := named.Underlying().(type) {
+				case *types.Interface:
+					notNatives[named] = true
+				case *types.Struct:
+					for nn, _ := range getNotNativeTypes(u, depth+1) {
+						notNatives[nn] = true
+					}
+				}
+			case *types.Signature:
 				notNatives[notNative] = true
 			}
+
+			notNatives[notNative] = true
 		}
 	}
 

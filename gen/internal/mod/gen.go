@@ -48,10 +48,10 @@ func GenerateFabrics(
 					}
 				case *types.Struct:
 					for notNativeType := range getNotNativeTypes(u, 1) {
-						switch t := notNativeType.(type) {
+						switch t := notNativeType.Underlying().(type) {
 						case *types.Interface:
 							if funcs := createFabricOfInterfaces(
-								t,
+								notNativeType,
 								qualifier,
 								supportedInterfaces,
 							); funcs != nil {
