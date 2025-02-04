@@ -2,6 +2,8 @@ package mod
 
 import "go/types"
 
+const maxDepth int = 5
+
 type Struct struct {
 	StructName   string
 	PkgName      string        // package name (should be the same as the package's package statement)
