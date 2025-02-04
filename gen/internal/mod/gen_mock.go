@@ -9,6 +9,8 @@ func GenerateMockFabrics(
 	targets []*Func,
 	typeContext *TypeContext,
 	qualifier *ImportQualifier,
+	relativePackagePath string,
+	maxDepth int,
 ) ([]*GeneratedFunc, []byte) {
 	var interfacesThatNeededMock []*types.Named
 	//var funcsThatNeededMock []*types.Signature
@@ -41,7 +43,7 @@ func GenerateMockFabrics(
 		}
 	}
 
-	interfaceMockFabrics := createInterfaceMocks(interfacesThatNeededMock, typeContext, qualifier)
+	interfaceMockFabrics := createInterfaceMocks(interfacesThatNeededMock, typeContext, qualifier, relativePackagePath, maxDepth)
 
 	return interfaceMockFabrics, generateMockeryYaml(interfacesThatNeededMock)
 }
@@ -72,10 +74,12 @@ func createInterfaceMocks(
 	interfacesThatNeededMock []*types.Named,
 	typeContext *TypeContext,
 	qualifier *ImportQualifier,
+	relativePackagePath string,
+	maxDepth int,
 ) []*GeneratedFunc {
 	alreadyCreatedMocks := make(map[*types.Named]*GeneratedFunc)
 	for _, i := range interfacesThatNeededMock {
-		createInterfaceMockRec(i, alreadyCreatedMocks, 1, typeContext, qualifier)
+		createInterfaceMockRec(i, alreadyCreatedMocks, 1, typeContext, qualifier, relativePackagePath, maxDepth)
 	}
 
 	var funcs []*GeneratedFunc
@@ -92,6 +96,8 @@ func createInterfaceMockRec(
 	depth int,
 	typeContext *TypeContext,
 	qualifier *ImportQualifier,
+	relativePackagePath string,
+	maxDepth int,
 ) {
 	if _, ok := created[interfacesThatNeededMock]; ok {
 		return
@@ -102,8 +108,14 @@ func createInterfaceMockRec(
 		return
 	}
 
-	currentFolder := "{here_should_be_path_to_mocks}"
-	importPath := fmt.Sprintf("%s/mocks/%s", currentFolder, obj.Pkg().Path())
+	// Maybe exists better sln for this case
+	var importPath string
+	if relativePackagePath == "" {
+		importPath = fmt.Sprintf("mocks/%s", obj.Pkg().Path())
+	} else {
+		importPath = fmt.Sprintf("%s/mocks/%s", relativePackagePath, obj.Pkg().Path())
+	}
+
 	importPrefix := qualifier.AddImport("mocks", importPath)
 
 	interfaceName := interfacesThatNeededMock.Obj().Name()
@@ -140,7 +152,7 @@ func createInterfaceMockRec(
 					continue
 				}
 
-				createInterfaceMockRec(named, created, depth+1, typeContext, qualifier)
+				createInterfaceMockRec(named, created, depth+1, typeContext, qualifier, relativePackagePath, maxDepth)
 			}
 		}
 	}

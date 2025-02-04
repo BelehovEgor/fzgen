@@ -8,8 +8,6 @@ import (
 	"sort"
 )
 
-const maxDepth = 10
-
 type GeneratedFunc struct {
 	Name, Body, ReturnType string
 }

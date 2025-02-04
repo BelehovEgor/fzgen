@@ -77,6 +77,8 @@ func FzgenMain() int {
 
 	// Mocks
 	mocksEnabled := flag.Bool("mocks", false, "generates mocks for all interfaces that can be argument of functions")
+	relativePath := flag.String("package", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
+	maxDepth := flag.Int("mocks_depth", 3, "max mock depth (default: 3)")
 
 	flag.Parse()
 
@@ -183,6 +185,8 @@ func FzgenMain() int {
 			qualifyAll:    qualifyAll,
 			topComment:    topComment,
 			requiredMocks: *mocksEnabled,
+			relativePath:  *relativePath,
+			maxMockDepth:  *maxDepth,
 		}
 
 		// Do the actual work of emitting our wrappers.

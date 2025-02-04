@@ -17,6 +17,8 @@ type wrapperOptions struct {
 	topComment    string // additional comment for top of generated file.
 	parallel      bool
 	requiredMocks bool
+	relativePath  string // helps mocks define mock imports
+	maxMockDepth  int
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -66,7 +68,7 @@ func emitIndependentWrappers(
 	var yaml []byte
 	if options.requiredMocks {
 		var mocks []*mod.GeneratedFunc
-		mocks, yaml = mod.GenerateMockFabrics(pkgFuncs.Targets, typeContext, qualifier)
+		mocks, yaml = mod.GenerateMockFabrics(pkgFuncs.Targets, typeContext, qualifier, options.relativePath, options.maxMockDepth)
 		for _, mock := range mocks {
 			fabrics[mock.ReturnType] = append(fabrics[mock.ReturnType], mock)
 		}
