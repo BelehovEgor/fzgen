@@ -53,7 +53,7 @@ func GenerateFabrics(
 								qualifier,
 								supportedInterfaces,
 							); funcs != nil {
-								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
+								generated[types.TypeString(notNativeType, qualifier.Qualifier)] = funcs
 								typeContext.AddType(t)
 							}
 						case *types.Signature:
@@ -66,7 +66,7 @@ func GenerateFabrics(
 								funcs := make([]*GeneratedFunc, 1)
 								funcs[0] = f
 
-								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
+								generated[types.TypeString(notNativeType, qualifier.Qualifier)] = funcs
 								typeContext.AddType(t)
 							}
 						}

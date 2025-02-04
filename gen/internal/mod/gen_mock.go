@@ -13,7 +13,7 @@ func GenerateMockFabrics(
 	maxDepth int,
 ) ([]*GeneratedFunc, []byte) {
 	var interfacesThatNeededMock []*types.Named
-	//var funcsThatNeededMock []*types.Signature
+	var funcsThatNeededMock []*types.Signature
 
 	for _, target := range targets {
 		for _, param := range target.Params() {
@@ -32,12 +32,12 @@ func GenerateMockFabrics(
 									interfacesThatNeededMock = append(interfacesThatNeededMock, structNotNative)
 								}
 							case *types.Signature:
-								//funcsThatNeededMock = append(funcsThatNeededMock, structNotNative)
+								funcsThatNeededMock = append(funcsThatNeededMock, structNotNative)
 							}
 						}
 					}
 				case *types.Signature:
-					//funcsThatNeededMock = append(funcsThatNeededMock, t)
+					funcsThatNeededMock = append(funcsThatNeededMock, t)
 				}
 			}
 		}
@@ -59,15 +59,28 @@ func generateMockeryYaml(interfaces []*types.Named) []byte {
 	buf, emit := createEmmiter()
 	emit("with-expecter: True\n")
 	emit("packages:\n")
+
+	hasDefines := false
 	for pkg, group := range groppedByPackage {
 		emit("  %s:\n", pkg)
 		emit("    interfaces:\n")
+
+		alreadyDefined := make(map[string]bool)
 		for _, i := range group {
-			emit("      %s:\n", i.Obj().Name())
+			name := i.Obj().Name()
+			if !alreadyDefined[name] {
+				emit("      %s:\n", name)
+				alreadyDefined[name] = true
+				hasDefines = true
+			}
 		}
 	}
 
-	return buf.Bytes()
+	if hasDefines {
+		return buf.Bytes()
+	} else {
+		return nil
+	}
 }
 
 func createInterfaceMocks(
@@ -99,6 +112,11 @@ func createInterfaceMockRec(
 	relativePackagePath string,
 	maxDepth int,
 ) {
+	iface, ok := interfacesThatNeededMock.Underlying().(*types.Interface)
+	if !ok {
+		return
+	}
+
 	if _, ok := created[interfacesThatNeededMock]; ok {
 		return
 	}
@@ -136,14 +154,18 @@ func createInterfaceMockRec(
 	}
 
 	var returnValues []*types.Var
-	iface := interfacesThatNeededMock.Underlying().(*types.Interface)
+	var supportedMethods []*types.Func
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
 		sig := method.Type().(*types.Signature)
 
+		isSupported := true
 		for j := 0; j < sig.Results().Len(); j++ {
+			if !isSupported {
+				break
+			}
+
 			result := sig.Results().At(j)
-			returnValues = append(returnValues, result)
 
 			namedOrSignatures := getNamedOrSignatureTypes(result.Type())
 			for _, t := range namedOrSignatures {
@@ -153,6 +175,20 @@ func createInterfaceMockRec(
 				}
 
 				createInterfaceMockRec(named, created, depth+1, typeContext, qualifier, relativePackagePath, maxDepth)
+			}
+
+			if !typeContext.IsSupported(result.Type()) {
+				isSupported = false
+				break
+			}
+		}
+
+		if isSupported {
+			supportedMethods = append(supportedMethods, method)
+
+			for j := 0; j < sig.Results().Len(); j++ {
+				result := sig.Results().At(j)
+				returnValues = append(returnValues, result)
 			}
 		}
 	}
@@ -175,16 +211,15 @@ func createInterfaceMockRec(
 	emit("\tgenMock := %s.NewMock%s(t)\n", importPrefix, interfaceName)
 
 	varIndex := 0
-	for i := 0; i < iface.NumMethods(); i++ {
-		method := iface.Method(i)
+	for _, method := range supportedMethods {
 		sig := method.Type().(*types.Signature)
 
 		emit("\tgenMock.\n")
 		emit("\t\tOn(\"%s\"", method.Name())
-		for j := 0; j < sig.Results().Len(); j++ {
-			result := sig.Results().At(j)
-			resultType := types.TypeString(result.Type(), qualifier.Qualifier)
-			emit(", mock.AnythingOfType(\"%s\")", resultType)
+		for j := 0; j < sig.Params().Len(); j++ {
+			param := sig.Params().At(j)
+			paramType := types.TypeString(param.Type(), qualifier.Qualifier)
+			emit(", mock.AnythingOfType(\"%s\")", paramType)
 		}
 		emit(").\n")
 
