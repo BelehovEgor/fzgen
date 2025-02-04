@@ -3,6 +3,7 @@ package mod
 import (
 	"fmt"
 	"go/types"
+	"reflect"
 	"regexp"
 )
 
@@ -70,6 +71,16 @@ func (tc *TypeContext) AddFunc(f *Func) {
 }
 
 func (tc *TypeContext) AddStruct(s *Struct) {
+	scope := s.TypesNamed.Obj().Parent()
+	if scope != nil {
+		reflection := reflect.ValueOf(*scope)
+
+		// check that scope of struct declaration is not function
+		if reflection.FieldByName("isFunc").Bool() {
+			return
+		}
+	}
+
 	tc.ExistedStructs = append(tc.ExistedStructs, s)
 
 	for _, i := range tc.ExistedInterfaces {
