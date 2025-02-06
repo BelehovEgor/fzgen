@@ -31,7 +31,7 @@ import (
 // Usage contains short usage information.
 var Usage = `
 Usage:
-	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [package]
+	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [package]
 	
 Running fzgen without any arguments targets the package in the current directory.
 
@@ -77,7 +77,7 @@ func FzgenMain() int {
 
 	// Mocks
 	mocksEnabled := flag.Bool("mocks", false, "generates mocks for all interfaces that can be argument of functions")
-	packagePath := flag.String("package", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
+	mocksPackagePrefix := flag.String("mocksPackagePrefix", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
 	maxDepth := flag.Int("mocks_depth", 3, "max mock depth (default: 3)")
 
 	flag.Parse()
@@ -105,8 +105,8 @@ func FzgenMain() int {
 		return 2
 	}
 
-	if *mocksEnabled && *packagePath == "" {
-		fmt.Fprint(os.Stderr, "fzgen: -mocksEnabled flag requires -package\n")
+	if *mocksEnabled && *mocksPackagePrefix == "" {
+		fmt.Fprint(os.Stderr, "fzgen: -mocks flag requires -mocksPackagePrefix\n")
 		return 2
 	}
 
@@ -187,11 +187,11 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll:    qualifyAll,
-			topComment:    topComment,
-			requiredMocks: *mocksEnabled,
-			relativePath:  *packagePath,
-			maxMockDepth:  *maxDepth,
+			qualifyAll:         qualifyAll,
+			topComment:         topComment,
+			requiredMocks:      *mocksEnabled,
+			mocksPackagePrefix: *mocksPackagePrefix,
+			maxMockDepth:       *maxDepth,
 		}
 
 		// Do the actual work of emitting our wrappers.
