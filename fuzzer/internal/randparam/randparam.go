@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"testing"
 )
 
 // Fuzzer generates random values for public members.
@@ -28,6 +29,7 @@ import (
 type Fuzzer struct {
 	fzgoSrc       *randSource
 	typeFabricMap map[string][]reflect.Value
+	t             *testing.T
 
 	// tech
 	used map[reflect.Value]bool
@@ -64,12 +66,13 @@ func NewFuzzer(data []byte) *Fuzzer {
 	return f
 }
 
-func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value) *Fuzzer {
+func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, t *testing.T) *Fuzzer {
 	fzgoSrc := &randSource{data}
 
 	f := &Fuzzer{
 		fzgoSrc:       fzgoSrc,
 		typeFabricMap: typeFabricMap,
+		t:             t,
 	}
 
 	fzgoSrc.Byte()
@@ -229,6 +232,12 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	for i := 0; i < fnType.NumIn(); i++ {
 		inParamType := fnType.In(i)
 		inParamValue := reflect.New(inParamType).Elem()
+
+		_, ok := inParamValue.Interface().(*testing.T)
+		if ok {
+			args[i] = reflect.ValueOf(f.t)
+			continue
+		}
 
 		f.fill(inParamValue, depth+1, opts)
 		args[i] = inParamValue

@@ -56,11 +56,11 @@ func TestTypes(t *testing.T) {
 			}
 
 			golden := filepath.Join("..", "testdata", tt.name)
-			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
+			gen, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
-			out, err = imports.Process("autofuzz_test.go", out, nil)
+			out, err := imports.Process("autofuzz_test.go", gen.Tests, nil)
 			if err != nil {
 				t.Fatalf("imports.Process() failed: %v", err)
 			}
@@ -131,11 +131,11 @@ func TestConstructorInjection(t *testing.T) {
 				qualifyAll: tt.qualifyAll,
 			}
 			golden := filepath.Join("..", "testdata", tt.name)
-			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
+			gen, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
-			out, err = imports.Process("autofuzz_test.go", out, nil)
+			out, err := imports.Process("autofuzz_test.go", gen.Tests, nil)
 			if err != nil {
 				t.Fatalf("imports.Process() failed: %v", err)
 			}
@@ -219,11 +219,11 @@ func TestExported(t *testing.T) {
 			}
 
 			golden := filepath.Join("..", "testdata", tt.name)
-			out, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
+			gen, err := emitIndependentWrappers(golden, pkgs[0], analyzeResult.TypeContext, "examplefuzz", wrapperOpts)
 			if err != nil {
 				t.Fatalf("createWrappers() failed: %v", err)
 			}
-			out, err = imports.Process("autofuzz_test.go", out, nil)
+			out, err := imports.Process("autofuzz_test.go", gen.Tests, nil)
 			if err != nil {
 				t.Fatalf("imports.Process() failed: %v", err)
 			}

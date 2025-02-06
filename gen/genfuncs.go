@@ -13,9 +13,12 @@ import (
 )
 
 type wrapperOptions struct {
-	qualifyAll bool   // qualify all variables with package name
-	topComment string // additional comment for top of generated file.
-	parallel   bool
+	qualifyAll         bool   // qualify all variables with package name
+	topComment         string // additional comment for top of generated file.
+	parallel           bool
+	requiredMocks      bool
+	mocksPackagePrefix string // helps mocks define mock imports
+	maxMockDepth       int
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -24,6 +27,11 @@ var (
 	errNoFunctionsMatch  = errors.New("no fuzzable functions found")
 	errUnsupportedParams = errors.New("unsupported parameters")
 )
+
+type generated struct {
+	Tests       []byte
+	MockeryYaml []byte
+}
 
 // emitIndependentWrappers emits fuzzing wrappers where possible for the list of functions passed in.
 // It might skip a function if it has no input parameters, or if it has a non-fuzzable parameter
@@ -34,7 +42,7 @@ func emitIndependentWrappers(
 	typeContext *mod.TypeContext,
 	wrapperPkgName string,
 	options wrapperOptions,
-) ([]byte, error) {
+) (*generated, error) {
 	if len(pkgFuncs.Targets) == 0 {
 		return nil, fmt.Errorf("%w: 0 matching functions", errNoFunctionsMatch)
 	}
@@ -57,6 +65,15 @@ func emitIndependentWrappers(
 
 	qualifier := mod.NewQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
 	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier)
+	var yaml []byte
+	if options.requiredMocks {
+		var mocks []*mod.GeneratedFunc
+		mocks, yaml = mod.GenerateMockFabrics(pkgFuncs.Targets, typeContext, qualifier, options.mocksPackagePrefix, options.maxMockDepth)
+		for _, mock := range mocks {
+			fabrics[mock.ReturnType] = append(fabrics[mock.ReturnType], mock)
+		}
+	}
+
 	init := mod.GenerateInitTestFunc(fabrics, typeContext, qualifier)
 
 	// emit the intro material
@@ -102,7 +119,10 @@ func emitIndependentWrappers(
 
 	emit("%s\n\n", init.Body)
 
-	return buf.Bytes(), nil
+	return &generated{
+		Tests:       buf.Bytes(),
+		MockeryYaml: yaml,
+	}, nil
 }
 
 // paramRepr contains string representations of inputParams to the wrapper function that we are
@@ -207,7 +227,7 @@ func emitIndependentWrapper(
 	}
 
 	fillErrVarName := varContext.CreateUniqueName("err")
-	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)\n")
+	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t)\n")
 	emit("\t\t%s := fz.Fill2(", fillErrVarName)
 	for i, p := range paramReprs {
 		if i > 0 {
@@ -234,7 +254,7 @@ func emitIndependentWrapper(
 }
 
 func emitFillResultCheck(emit emitFunc, fillErrorName string, allParams []*paramRepr) {
-	emit("\tif %s != nil", fillErrorName)
+	emit("\t\tif %s != nil", fillErrorName)
 
 	for _, p := range allParams {
 		_, ok := p.v.Type().(*types.Pointer)
@@ -245,8 +265,8 @@ func emitFillResultCheck(emit emitFunc, fillErrorName string, allParams []*param
 		}
 	}
 	emit(" {\n")
-	emit("\t\treturn\n")
-	emit("\t}\n")
+	emit("\t\t\treturn\n")
+	emit("\t\t}\n")
 }
 
 // emitWrappedFunc emits the call to the function under test.
@@ -262,9 +282,9 @@ func emitWrappedFunc(
 ) {
 	switch {
 	case recv != nil:
-		emit("\t%s.%s(", recv.paramName, f.TypeString(qualifier))
+		emit("\t\t%s.%s(", recv.paramName, f.TypeString(qualifier))
 	default:
-		emit("\t%s(", f.TypeString(qualifier))
+		emit("\t\t%s(", f.TypeString(qualifier))
 	}
 	emitArgs(emit, f, paramReprs)
 	emit(")\n")

@@ -8,8 +8,6 @@ import (
 	"sort"
 )
 
-const maxDepth = 10
-
 type GeneratedFunc struct {
 	Name, Body, ReturnType string
 }
@@ -55,7 +53,7 @@ func GenerateFabrics(
 								qualifier,
 								supportedInterfaces,
 							); funcs != nil {
-								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
+								generated[types.TypeString(notNativeType, qualifier.Qualifier)] = funcs
 								typeContext.AddType(t)
 							}
 						case *types.Signature:
@@ -68,7 +66,7 @@ func GenerateFabrics(
 								funcs := make([]*GeneratedFunc, 1)
 								funcs[0] = f
 
-								generated[types.TypeString(t, qualifier.Qualifier)] = funcs
+								generated[types.TypeString(notNativeType, qualifier.Qualifier)] = funcs
 								typeContext.AddType(t)
 							}
 						}
@@ -112,7 +110,7 @@ func GenerateInitTestFunc(
 
 		for _, f := range funcs {
 			emit(
-				"FabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",
+				"\tFabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",
 				f.ReturnType,
 				f.ReturnType,
 				f.Name,

@@ -48,6 +48,9 @@ func NewQualifier(pkgName, pkgPath, outPkgName, outPkgPath string, isLocalTest b
 		q.Imports["github.com/BelehovEgor/fzgen/fuzzer"] = "fuzzer_1"
 	}
 
+	q.Imports["reflect"] = ""
+	q.Imports["github.com/stretchr/testify/mock"] = ""
+
 	return q
 }
 
@@ -69,6 +72,29 @@ func (iq *ImportQualifier) GetImportStrings() []string {
 	}
 
 	return imports
+}
+
+func (iq *ImportQualifier) AddImport(defaultName, path string) string {
+	name, has := iq.Imports[path]
+	if has {
+		return name
+	}
+
+	idx, has := iq.importNames[defaultName]
+	if has {
+		idx++
+		iq.importNames[defaultName] = idx
+
+		name = fmt.Sprintf("%s_%d", defaultName, idx)
+		iq.Imports[path] = name
+
+		return name
+	}
+
+	iq.Imports[path] = defaultName
+	iq.importNames[defaultName] = 0
+
+	return defaultName
 }
 
 func (iq *ImportQualifier) Qualifier(p *types.Package) string {

@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/BelehovEgor/fzgen/fuzzer/internal/plan"
 	"github.com/BelehovEgor/fzgen/fuzzer/internal/randparam"
@@ -69,8 +70,8 @@ func NewFuzzer(data []byte, options ...FuzzerOpt) (fz *Fuzzer) {
 	}
 }
 
-func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, options ...FuzzerOpt) (fz *Fuzzer) {
-	fill := randparam.NewFuzzerV2(data, typeFabricMap)
+func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, t *testing.T, options ...FuzzerOpt) (fz *Fuzzer) {
+	fill := randparam.NewFuzzerV2(data, typeFabricMap, t)
 	state := &execState{
 		reusableInputs: make(map[reflect.Type][]*reflect.Value),
 		outputSlots:    make(map[reflect.Type][]*outputSlot),

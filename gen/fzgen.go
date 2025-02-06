@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -30,7 +31,7 @@ import (
 // Usage contains short usage information.
 var Usage = `
 Usage:
-	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [package]
+	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [package]
 	
 Running fzgen without any arguments targets the package in the current directory.
 
@@ -74,6 +75,11 @@ func FzgenMain() int {
 	funcPatternFlag := flag.String("func", ".", "function regex, defaults to matching all candidate functions")
 	unexportedFlag := flag.Bool("unexported", false, "emit wrappers for unexported functions in addition to exported functions")
 
+	// Mocks
+	mocksEnabled := flag.Bool("mocks", false, "generates mocks for all interfaces that can be argument of functions")
+	mocksPackagePrefix := flag.String("mocksPackagePrefix", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
+	maxDepth := flag.Int("mocks_depth", 3, "max mock depth (default: 3)")
+
 	flag.Parse()
 
 	var pkgPattern string
@@ -96,6 +102,11 @@ func FzgenMain() int {
 
 	if *parallelFlag && !*chainFlag {
 		fmt.Fprint(os.Stderr, "fzgen: -parallel flag requires -chain\n")
+		return 2
+	}
+
+	if *mocksEnabled && *mocksPackagePrefix == "" {
+		fmt.Fprint(os.Stderr, "fzgen: -mocks flag requires -mocksPackagePrefix\n")
 		return 2
 	}
 
@@ -176,14 +187,21 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll: qualifyAll,
-			topComment: topComment,
+			qualifyAll:         qualifyAll,
+			topComment:         topComment,
+			requiredMocks:      *mocksEnabled,
+			mocksPackagePrefix: *mocksPackagePrefix,
+			maxMockDepth:       *maxDepth,
 		}
 
 		// Do the actual work of emitting our wrappers.
 		var out []byte
+		var yaml []byte
+		var gen *generated
 		if !*chainFlag {
-			out, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+			gen, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+			out = gen.Tests
+			yaml = gen.MockeryYaml
 		} else {
 			out, err = emitChainWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
 		}
@@ -194,7 +212,22 @@ func FzgenMain() int {
 		}
 		generatedFiles++
 
-		// Fix up any needed imports.
+		if yaml != nil {
+			err = os.WriteFile(fmt.Sprintf("%s/.mockery.yaml", outDir), yaml, 0o644)
+			if err != nil {
+				fail(err)
+			}
+
+			cmd := exec.Command("mockery")
+			cmd.Dir = outDir
+			_, err := cmd.Output()
+			if err != nil {
+				fmt.Println(err.Error())
+				fail(err)
+			}
+		}
+
+		//Fix up any needed imports.
 		var adjusted []byte
 		abs, err := filepath.Abs(outFile)
 		if err != nil {
