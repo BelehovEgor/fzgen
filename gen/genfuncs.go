@@ -227,7 +227,7 @@ func emitIndependentWrapper(
 	}
 
 	fillErrVarName := varContext.CreateUniqueName("err")
-	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)\n")
+	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t)\n")
 	emit("\t\t%s := fz.Fill2(", fillErrVarName)
 	for i, p := range paramReprs {
 		if i > 0 {
