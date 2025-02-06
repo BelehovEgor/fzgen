@@ -34,6 +34,8 @@ func GenerateMockFabrics(
 								typesThatNeededMock = append(typesThatNeededMock, structNotNative)
 							}
 						}
+					case *types.Signature:
+						typesThatNeededMock = append(typesThatNeededMock, t)
 					}
 				case *types.Signature:
 					typesThatNeededMock = append(typesThatNeededMock, t)
@@ -118,9 +120,26 @@ func createMock(
 ) {
 	switch t := typeThatNeededMock.(type) {
 	case *types.Named:
-		createInterfaceMock(t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+		createNamedMock(t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	case *types.Signature:
 		createFuncMock(t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+	}
+}
+
+func createNamedMock(
+	interfacesThatNeededMock *types.Named,
+	created map[types.Type]*GeneratedFunc,
+	depth int,
+	typeContext *TypeContext,
+	qualifier *ImportQualifier,
+	relativePackagePath string,
+	maxDepth int,
+) {
+	switch interfacesThatNeededMock.Underlying().(type) {
+	case *types.Interface:
+		createInterfaceMock(interfacesThatNeededMock, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+	case *types.Signature:
+		createNamedFuncMock(interfacesThatNeededMock, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	}
 }
 
@@ -260,6 +279,27 @@ func createInterfaceMock(
 }
 
 var Index int = 0
+
+func createNamedFuncMock(
+	signatureThatNeededMock *types.Named,
+	created map[types.Type]*GeneratedFunc,
+	depth int,
+	typeContext *TypeContext,
+	qualifier *ImportQualifier,
+	relativePackagePath string,
+	maxDepth int,
+) {
+	sig, ok := signatureThatNeededMock.Underlying().(*types.Signature)
+	if !ok {
+		return
+	}
+
+	createFuncMock(sig, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+
+	if typeContext.IsSupported(sig) {
+		typeContext.AddType(signatureThatNeededMock)
+	}
+}
 
 func createFuncMock(
 	signatureThatNeededMock *types.Signature,
