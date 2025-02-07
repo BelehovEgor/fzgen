@@ -10,6 +10,7 @@ import (
 
 type GeneratedFunc struct {
 	Name, Body, ReturnType string
+	Type                   types.Type
 }
 
 func GenerateFabrics(
@@ -250,10 +251,11 @@ func createFabricOfInterfaces(
 	if !ok {
 		return nil
 	}
-	return createFabricOfInterfaces2(supported, qualifier)
+	return createFabricOfInterfaces2(named, supported, qualifier)
 }
 
 func createFabricOfInterfaces2(
+	named *types.Named,
 	pkgInterface *Interface,
 	qualifier *ImportQualifier,
 ) []*GeneratedFunc {
@@ -287,6 +289,7 @@ func createFabricOfInterfaces2(
 			Name:       funcName,
 			Body:       buf.String(),
 			ReturnType: pkgInterface.TypeString(qualifier.Qualifier),
+			Type:       named,
 		}
 	}
 
@@ -336,6 +339,7 @@ func createFabricOfFuncs(
 		Name:       funcName,
 		Body:       buf.String(),
 		ReturnType: returnType,
+		Type:       named,
 	}
 	return result
 }

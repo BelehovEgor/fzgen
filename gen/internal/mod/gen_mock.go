@@ -46,7 +46,14 @@ func GenerateMockFabrics(
 
 	mockFabrics := createMocks(typesThatNeededMock, typeContext, qualifier, relativePackagePath, maxDepth)
 
-	return mockFabrics, generateMockeryYaml(typesThatNeededMock)
+	var typesForMock []types.Type
+	for _, fabric := range mockFabrics {
+		if fabric.Type != nil {
+			typesForMock = append(typesForMock, fabric.Type)
+		}
+	}
+
+	return mockFabrics, generateMockeryYaml(typesForMock)
 }
 
 func generateMockeryYaml(mocks []types.Type) []byte {
@@ -57,17 +64,16 @@ func generateMockeryYaml(mocks []types.Type) []byte {
 			continue
 		}
 
+		if named == nil || named.Obj() == nil || named.Obj().Pkg() == nil {
+			continue
+		}
+
 		_, ok = named.Underlying().(*types.Interface)
 		if !ok {
 			continue
 		}
 
-		var pkg string
-		if named.Obj().Pkg() != nil {
-			pkg = named.Obj().Pkg().Path()
-		} else {
-			continue
-		}
+		pkg := named.Obj().Pkg().Path()
 
 		groppedByPackage[pkg] = append(groppedByPackage[pkg], named)
 	}
@@ -194,6 +200,7 @@ func createInterfaceMock(
 	genFunc := &GeneratedFunc{
 		Name:       funcName,
 		ReturnType: returnType,
+		Type:       interfacesThatNeededMock,
 	}
 	created[interfacesThatNeededMock] = genFunc
 	typeContext.AddType(interfacesThatNeededMock)
@@ -324,6 +331,7 @@ func createFuncMock(
 	genFunc := &GeneratedFunc{
 		Name:       funcName,
 		ReturnType: returnType,
+		Type:       namedType,
 	}
 
 	isSupported := true
@@ -422,5 +430,6 @@ func createEmptyInterfaceMock(
 		Name:       funcName,
 		Body:       buf.String(),
 		ReturnType: returnType,
+		Type:       named,
 	}
 }
