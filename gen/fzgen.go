@@ -31,7 +31,7 @@ import (
 // Usage contains short usage information.
 var Usage = `
 Usage:
-	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [package]
+	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [-package] [-maxDepth]
 	
 Running fzgen without any arguments targets the package in the current directory.
 

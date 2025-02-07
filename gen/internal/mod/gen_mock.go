@@ -52,13 +52,18 @@ func GenerateMockFabrics(
 func generateMockeryYaml(mocks []types.Type) []byte {
 	groppedByPackage := make(map[string][]*types.Named)
 	for _, m := range mocks {
-		i, ok := m.(*types.Named)
+		named, ok := m.(*types.Named)
 		if !ok {
 			continue
 		}
 
-		pkg := i.Obj().Pkg().Path()
-		groppedByPackage[pkg] = append(groppedByPackage[pkg], i)
+		_, ok = named.Underlying().(*types.Interface)
+		if !ok {
+			continue
+		}
+
+		pkg := named.Obj().Pkg().Path()
+		groppedByPackage[pkg] = append(groppedByPackage[pkg], named)
 	}
 
 	// mockery doesn't want work with \t
@@ -122,7 +127,7 @@ func createMock(
 	case *types.Named:
 		createNamedMock(t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	case *types.Signature:
-		createFuncMock(t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+		createFuncMock(nil, t, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	}
 }
 
@@ -135,11 +140,11 @@ func createNamedMock(
 	relativePackagePath string,
 	maxDepth int,
 ) {
-	switch interfacesThatNeededMock.Underlying().(type) {
+	switch u := interfacesThatNeededMock.Underlying().(type) {
 	case *types.Interface:
 		createInterfaceMock(interfacesThatNeededMock, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	case *types.Signature:
-		createNamedFuncMock(interfacesThatNeededMock, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
+		createFuncMock(interfacesThatNeededMock, u, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
 	}
 }
 
@@ -280,28 +285,8 @@ func createInterfaceMock(
 
 var Index int = 0
 
-func createNamedFuncMock(
-	signatureThatNeededMock *types.Named,
-	created map[types.Type]*GeneratedFunc,
-	depth int,
-	typeContext *TypeContext,
-	qualifier *ImportQualifier,
-	relativePackagePath string,
-	maxDepth int,
-) {
-	sig, ok := signatureThatNeededMock.Underlying().(*types.Signature)
-	if !ok {
-		return
-	}
-
-	createFuncMock(sig, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
-
-	if typeContext.IsSupported(sig) {
-		typeContext.AddType(signatureThatNeededMock)
-	}
-}
-
 func createFuncMock(
+	namedType *types.Named,
 	signatureThatNeededMock *types.Signature,
 	created map[types.Type]*GeneratedFunc,
 	depth int,
@@ -309,16 +294,24 @@ func createFuncMock(
 	qualifier *ImportQualifier,
 	relativePackagePath string,
 	maxDepth int,
-) {
+) *GeneratedFunc {
 	if _, ok := created[signatureThatNeededMock]; ok {
-		return
+		return nil
 	}
 
 	if depth == maxDepth {
-		return
+		return nil
 	}
 
-	returnType := types.TypeString(signatureThatNeededMock, qualifier.Qualifier)
+	sigTypeString := types.TypeString(signatureThatNeededMock, qualifier.Qualifier)
+
+	var returnType string
+	if namedType != nil {
+		returnType = types.TypeString(namedType, qualifier.Qualifier)
+	} else {
+		returnType = sigTypeString
+	}
+
 	Index++
 	funcName := fmt.Sprintf("fabric_mock_func_%d", Index)
 	genFunc := &GeneratedFunc{
@@ -346,11 +339,16 @@ func createFuncMock(
 	}
 
 	if !isSupported {
-		return
+		return nil
 	}
 
-	created[signatureThatNeededMock] = genFunc
-	typeContext.AddType(signatureThatNeededMock)
+	if namedType != nil {
+		created[namedType] = genFunc
+		typeContext.AddType(namedType)
+	} else {
+		created[signatureThatNeededMock] = genFunc
+		typeContext.AddType(signatureThatNeededMock)
+	}
 
 	buf, emit := createEmmiter()
 
@@ -379,45 +377,7 @@ func createFuncMock(
 		emit(") %s {\n", returnType)
 	}
 
-	emit("\treturn func(")
-
-	if signatureThatNeededMock.Params().Len() > 1 {
-		for i := 0; i < signatureThatNeededMock.Params().Len(); i++ {
-			param := signatureThatNeededMock.Params().At(i)
-			paramName := types.TypeString(param.Type(), qualifier.Qualifier)
-
-			emit("\n\t%s,", paramName)
-		}
-
-		emit("\n)")
-	} else {
-		for i := 0; i < signatureThatNeededMock.Params().Len(); i++ {
-			param := signatureThatNeededMock.Params().At(i)
-			paramName := types.TypeString(param.Type(), qualifier.Qualifier)
-
-			emit("%s", paramName)
-		}
-
-		emit(")")
-	}
-
-	if signatureThatNeededMock.Results().Len() > 1 {
-		emit("(")
-		for i := 0; i < signatureThatNeededMock.Results().Len(); i++ {
-			resultType := types.TypeString(signatureThatNeededMock.Results().At(i).Type(), qualifier.Qualifier)
-			if i == 0 {
-				emit("%s", resultType)
-			} else {
-				emit(", %s", resultType)
-			}
-		}
-		emit(")")
-	} else {
-		for i := 0; i < signatureThatNeededMock.Results().Len(); i++ {
-			resultType := types.TypeString(signatureThatNeededMock.Results().At(i).Type(), qualifier.Qualifier)
-			emit("%s", resultType)
-		}
-	}
+	emit("\treturn %s", sigTypeString)
 
 	emit(" {\n")
 
@@ -433,6 +393,8 @@ func createFuncMock(
 	emit("}\n")
 
 	genFunc.Body = buf.String()
+
+	return genFunc
 }
 
 func createEmptyInterfaceMock(
