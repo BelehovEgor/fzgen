@@ -293,7 +293,7 @@ func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
 		inParamValue := reflect.New(inParamType).Elem()
 
 		// only int now
-		f.Fill(inParamValue)
+		f.Fill(&inParamValue)
 		args[i] = inParamValue
 	}
 
