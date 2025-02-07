@@ -24,10 +24,6 @@ func (s *Struct) TypeString(qualifier types.Qualifier) string {
 	return types.TypeString(s.TypesNamed, qualifier)
 }
 
-func (s *Struct) GetNotNativeTypes() map[types.Type]bool {
-	return getNotNativeTypes(s.TypesStruct, 0)
-}
-
 func getNotNativeTypes(s *types.Struct, depth int) map[types.Type]bool {
 	notNatives := make(map[types.Type]bool)
 
@@ -49,12 +45,12 @@ func getNotNativeTypes(s *types.Struct, depth int) map[types.Type]bool {
 					for nn, _ := range getNotNativeTypes(u, depth+1) {
 						notNatives[nn] = true
 					}
+				case *types.Signature:
+					notNatives[named] = true
 				}
 			case *types.Signature:
 				notNatives[notNative] = true
 			}
-
-			notNatives[notNative] = true
 		}
 	}
 

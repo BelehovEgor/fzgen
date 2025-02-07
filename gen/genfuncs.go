@@ -64,7 +64,7 @@ func emitIndependentWrappers(
 	})
 
 	qualifier := mod.NewQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
-	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier, options.maxMockDepth)
 	var yaml []byte
 	if options.requiredMocks {
 		var mocks []*mod.GeneratedFunc

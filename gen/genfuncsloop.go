@@ -92,7 +92,7 @@ func emitChainWrappers(
 	}
 
 	qualifier := mod.NewQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
-	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier)
+	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier, options.maxMockDepth)
 	init := mod.GenerateInitTestFunc(fabrics, typeContext, qualifier)
 
 	// Emit the intro material
