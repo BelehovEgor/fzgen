@@ -342,8 +342,13 @@ func createFuncMock(
 		return nil
 	}
 
-	created[signatureThatNeededMock] = genFunc
-	typeContext.AddType(signatureThatNeededMock)
+	if namedType != nil {
+		created[namedType] = genFunc
+		typeContext.AddType(namedType)
+	} else {
+		created[signatureThatNeededMock] = genFunc
+		typeContext.AddType(signatureThatNeededMock)
+	}
 
 	buf, emit := createEmmiter()
 
