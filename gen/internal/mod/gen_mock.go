@@ -288,7 +288,7 @@ func createInterfaceMock(
 			}
 			varIndex++
 		}
-		emit("\n\t\t})\n")
+		emit("\n\t\t}).\n\t\tMaybe()\n")
 	}
 
 	emit("\treturn genMock\n")
