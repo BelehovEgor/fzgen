@@ -62,7 +62,13 @@ func generateMockeryYaml(mocks []types.Type) []byte {
 			continue
 		}
 
-		pkg := named.Obj().Pkg().Path()
+		var pkg string
+		if named.Obj().Pkg() != nil {
+			pkg = named.Obj().Pkg().Path()
+		} else {
+			continue
+		}
+
 		groppedByPackage[pkg] = append(groppedByPackage[pkg], named)
 	}
 
@@ -183,7 +189,8 @@ func createInterfaceMock(
 
 	interfaceName := interfacesThatNeededMock.Obj().Name()
 	returnType := types.TypeString(interfacesThatNeededMock, qualifier.Qualifier)
-	funcName := fmt.Sprintf("fabric_mock_interface_%s", interfaceName)
+	Index++
+	funcName := fmt.Sprintf("fabric_mock_interface_%d_%s", Index, interfaceName)
 	genFunc := &GeneratedFunc{
 		Name:       funcName,
 		ReturnType: returnType,
