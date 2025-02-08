@@ -245,20 +245,16 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 
 	res := fn.Call(args)
 	if len(res) == 2 {
-		err := res[1].Interface().(error)
-		if err != nil {
+		err, ok := res[1].Interface().(error)
+		if ok && err != nil {
 			return err
 		}
-		reflectValue.Set(res[0])
 	}
 
-	if len(res) == 1 {
-		resN := res[0]
-		if resN.Kind() == reflect.Ptr {
-			reflectValue.Set(resN.Elem())
-		} else {
-			reflectValue.Set(resN)
-		}
+	if res[0].Kind() == reflect.Pointer {
+		reflectValue.Set(res[0].Elem())
+	} else {
+		reflectValue.Set(res[0])
 	}
 
 	if isFirstInterfaceInStack {
