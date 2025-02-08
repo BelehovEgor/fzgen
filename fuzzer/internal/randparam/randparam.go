@@ -264,7 +264,7 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	return nil
 }
 
-func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
+func (f *Fuzzer) fillFunc(reflectValue reflect.Value, depth int, opts fillOpts) bool {
 	if f.typeFabricMap == nil {
 		return false
 	}
@@ -289,7 +289,7 @@ func (f *Fuzzer) fillFunc(reflectValue reflect.Value) bool {
 		inParamValue := reflect.New(inParamType).Elem()
 
 		// only int now
-		f.Fill(&inParamValue)
+		f.fill(inParamValue, depth+1, opts)
 		args[i] = inParamValue
 	}
 
@@ -709,7 +709,7 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 		v.Set(reflect.New(v.Type().Elem()))
 		f.fill(v.Elem(), depth, opts)
 	case reflect.Func:
-		success := f.fillFunc(v)
+		success := f.fillFunc(v, depth, opts)
 		if !success && opts.panicOnUnsupported {
 			panic(fmt.Sprintf("fzgen: fill: unsupported func kind %v for value %v of type %v", v.Kind(), v, v.Type()))
 		}
