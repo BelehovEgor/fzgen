@@ -126,7 +126,7 @@ func (f *Fuzzer) Data() []byte {
 //			  9 crypto/cipher.Block
 //			  8 net.Listener
 //			  6 go/ast.Node
-func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) error {
+func (f *Fuzzer) fillInterface(reflectValue reflect.Value, depth int, opts fillOpts) error {
 	obj := reflectValue.Addr().Interface()
 	var b []byte
 	switch v := obj.(type) {
@@ -186,7 +186,7 @@ func (f *Fuzzer) fillInterface(reflectValue reflect.Value, opts fillOpts) error 
 
 	// No match
 	default:
-		return f.fillUsingFabric(reflectValue, 0, opts)
+		return f.fillUsingFabric(reflectValue, depth, opts)
 	}
 	return nil
 }
@@ -688,7 +688,7 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 			f.Fill(&createStructUsingConstructor)
 
 			if createStructUsingConstructor {
-				err := f.fillUsingFabric(v, 0, opts)
+				err := f.fillUsingFabric(v, depth, opts)
 				return err
 			}
 		}
@@ -702,7 +702,7 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 			}
 		}
 	case reflect.Interface:
-		err := f.fillInterface(v, opts)
+		err := f.fillInterface(v, depth, opts)
 		return err
 	case reflect.Ptr:
 		// create a zero value elem, then recursively fill that
