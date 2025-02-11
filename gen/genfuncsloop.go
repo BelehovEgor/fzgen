@@ -28,7 +28,7 @@ func emitChainWrappers(
 	typeContext *mod.TypeContext,
 	wrapperPkgName string,
 	options wrapperOptions,
-) ([]byte, error) {
+) (*generated, error) {
 	possibleConstructors := typeContext.ValidConstructors
 	if len(possibleConstructors) == 0 {
 		return nil, errNoConstructorsMatch
@@ -93,6 +93,15 @@ func emitChainWrappers(
 
 	qualifier := mod.NewQualifier(pkgFuncs.PkgName, pkgFuncs.PkgPath, wrapperPkgName, outPkgPath, !options.qualifyAll)
 	fabrics := mod.GenerateFabrics(pkgFuncs.Targets, typeContext, qualifier, options.maxMockDepth)
+	var yaml []byte
+	if options.requiredMocks {
+		var mocks []*mod.GeneratedFunc
+		mocks, yaml = mod.GenerateMockFabrics(pkgFuncs.Targets, typeContext, qualifier, options.mocksPackagePrefix, options.maxMockDepth)
+		for _, mock := range mocks {
+			fabrics[mock.ReturnType] = append(fabrics[mock.ReturnType], mock)
+		}
+	}
+
 	init := mod.GenerateInitTestFunc(fabrics, typeContext, qualifier)
 
 	// Emit the intro material
@@ -137,7 +146,12 @@ func emitChainWrappers(
 
 	emit("%s\n\n", init.Body)
 
-	return buf.Bytes(), nil
+	generated := &generated{
+		MockeryYaml: yaml,
+		Tests:       buf.Bytes(),
+	}
+
+	return generated, nil
 }
 
 // emitChainWrapper emits one fuzzing wrapper where possible for the list of functions passed in.
@@ -174,7 +188,7 @@ func emitChainWrapper(
 	recvName := variablesContext.CreateUniqueName("target")
 	recvType := types.TypeString(recv, importQualifier.Qualifier)
 	emit("\t\tvar %s %s\n", recvName, recvType)
-	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes)\n")
+	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t)\n")
 
 	fillErrorName := variablesContext.CreateUniqueName("fillError")
 	emit("\t\t%s := fz.Fill2(&%s)\n", fillErrorName, recvName)

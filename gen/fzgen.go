@@ -195,15 +195,11 @@ func FzgenMain() int {
 		}
 
 		// Do the actual work of emitting our wrappers.
-		var out []byte
-		var yaml []byte
 		var gen *generated
 		if !*chainFlag {
 			gen, err = emitIndependentWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
-			out = gen.Tests
-			yaml = gen.MockeryYaml
 		} else {
-			out, err = emitChainWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
+			gen, err = emitChainWrappers(outDir, pkgs[i], analyzeResult.TypeContext, wrapperPkgName, wrapperOpts)
 		}
 
 		// Handle certain common errors gracefully, including skipping & continuing if multiple target packages.
@@ -212,8 +208,8 @@ func FzgenMain() int {
 		}
 		generatedFiles++
 
-		if yaml != nil {
-			err = os.WriteFile(fmt.Sprintf("%s/.mockery.yaml", outDir), yaml, 0o644)
+		if gen.MockeryYaml != nil {
+			err = os.WriteFile(fmt.Sprintf("%s/.mockery.yaml", outDir), gen.MockeryYaml, 0o644)
 			if err != nil {
 				fail(err)
 			}
@@ -234,10 +230,10 @@ func FzgenMain() int {
 			fmt.Fprintln(os.Stderr, "fzgen: warning: continuing after failing to find abs path:", err)
 			abs = outFile
 		}
-		adjusted, err = imports.Process(abs, out, nil)
+		adjusted, err = imports.Process(abs, gen.Tests, nil)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "fzgen: warning: continuing after failing to automatically adjust imports:", err)
-			adjusted = out
+			adjusted = gen.Tests
 		}
 
 		// Write the output.
