@@ -239,7 +239,10 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 			continue
 		}
 
-		f.fill(inParamValue, depth+1, opts)
+		err := f.fill(inParamValue, depth+1, opts)
+		if err != nil {
+			return err
+		}
 		args[i] = inParamValue
 	}
 
@@ -599,7 +602,7 @@ type fillOpts struct {
 func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 	depth++
 	if depth > 10 {
-		return nil
+		return fmt.Errorf("too deep")
 	}
 
 	switch v.Kind() {
