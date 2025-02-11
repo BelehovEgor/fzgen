@@ -255,7 +255,9 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	}
 
 	if res[0].Kind() == reflect.Pointer {
-		reflectValue.Set(res[0].Elem())
+		if !res[0].IsNil() {
+			reflectValue.Set(res[0].Elem())
+		}
 	} else {
 		reflectValue.Set(res[0])
 	}
