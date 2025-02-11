@@ -144,6 +144,8 @@ func newParam(v *types.Var, varContext *mod.VariablesContext, qualifier types.Qu
 	return &paramRepr{paramName: paramName, typ: typeStringWithSelector, v: v}
 }
 
+var wrapperIndex int = 0
+
 // emitIndependentWrapper emits one fuzzing wrapper if possible.
 // It takes a list of possible constructors to insert into the wrapper body if the
 // constructor is suitable for creating the receiver of a wrapped method.
@@ -165,8 +167,9 @@ func emitIndependentWrapper(
 
 	// Determine our wrapper name, which includes the receiver's type if we are wrapping a method.
 	var wrapperName string
+	wrapperIndex++
 	if recv == nil {
-		wrapperName = fmt.Sprintf("Fuzz_%s", f.Name())
+		wrapperName = fmt.Sprintf("Fuzz_N%d_%s", wrapperIndex, f.Name())
 	} else {
 		n, err := namedType(recv)
 		if err != nil {
@@ -175,7 +178,7 @@ func emitIndependentWrapper(
 			return nil
 		}
 		recvNamedTypeLocalName := n.Obj().Name()
-		wrapperName = fmt.Sprintf("Fuzz_%s_%s", recvNamedTypeLocalName, f.Name())
+		wrapperName = fmt.Sprintf("Fuzz_N%d_%s_%s", wrapperIndex, recvNamedTypeLocalName, f.Name())
 	}
 
 	varContext := mod.NewVariablesContext(qualifier)
