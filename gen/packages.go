@@ -359,11 +359,23 @@ func isInterfaceRecv(f *types.Func) bool {
 		// not a method
 		return false
 	}
+
 	// TODO: this might be redundant check to do both Type() and Type().Underlying(), but shouldn't hurt.
 	_, ok = recv.Type().(*types.Interface)
 	if ok {
 		return true
 	}
+
+	_, ok = recv.Type().(*types.Signature)
+	if ok {
+		return true
+	}
+
 	_, ok = recv.Type().Underlying().(*types.Interface)
+	if ok {
+		return true
+	}
+
+	_, ok = recv.Type().Underlying().(*types.Signature)
 	return ok
 }
