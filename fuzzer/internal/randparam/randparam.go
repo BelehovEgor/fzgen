@@ -235,7 +235,7 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 
 		_, ok := inParamValue.Interface().(*testing.T)
 		if ok {
-			args[i] = reflect.ValueOf(f.t)
+			args = append(args, reflect.ValueOf(f.t))
 			continue
 		}
 
