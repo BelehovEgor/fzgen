@@ -228,7 +228,7 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	f.used[fn] = true
 	fnType := fn.Type()
 
-	args := make([]reflect.Value, fnType.NumIn())
+	args := make([]reflect.Value, 0, fnType.NumIn())
 	for i := 0; i < fnType.NumIn(); i++ {
 		inParamType := fnType.In(i)
 		inParamValue := reflect.New(inParamType).Elem()
