@@ -38,10 +38,7 @@ func GenerateFabrics(
 
 	for _, target := range targets {
 		for _, param := range target.Params() {
-			if funcs := createFabrics(param, qualifier, supportedInterfaces, existedFuncs, maxDepth); funcs != nil {
-				generated[types.TypeString(param.Type(), qualifier.Qualifier)] = funcs
-				typeContext.AddType(param.Type())
-			}
+			createFabrics(param, qualifier, supportedInterfaces, existedFuncs, maxDepth, generated, typeContext)
 		}
 	}
 
@@ -124,26 +121,31 @@ func createFabrics(
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
 	maxDepth int,
-) []*GeneratedFunc {
+	generated map[string][]*GeneratedFunc,
+	typeContext *TypeContext,
+) {
 	if maxDepth == 0 {
-		return nil
+		return
 	}
 
 	// get types that required fabrics
 	baseTypes := getNamedOrSignatureTypes(param.Type())
 	if len(baseTypes) == 0 {
-		return nil
+		return
 	}
 
-	var fabrics []*GeneratedFunc
 	for _, base := range baseTypes {
+		baseType := types.TypeString(base, qualifier.Qualifier)
+		if _, ok := generated[baseType]; ok {
+			continue
+		}
+
 		baseFabrics := createTypeFabrics(base, qualifier, supportedInterfaces, existedFuncs, maxDepth)
 		if baseFabrics != nil {
-			fabrics = append(fabrics, baseFabrics...)
+			generated[baseType] = baseFabrics
+			typeContext.AddType(param.Type())
 		}
 	}
-
-	return fabrics
 }
 
 func createTypeFabrics(

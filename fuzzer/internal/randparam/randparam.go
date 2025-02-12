@@ -243,7 +243,18 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 		if err != nil {
 			return err
 		}
-		args[i] = inParamValue
+
+		if i == fnType.NumIn()-1 && fnType.IsVariadic() {
+			length := inParamValue.Len()
+
+			// Iterate over each element in the slice
+			for i := 0; i < length; i++ {
+				element := inParamValue.Index(i)
+				args = append(args, element)
+			}
+		} else {
+			args = append(args, inParamValue)
+		}
 	}
 
 	res := fn.Call(args)
