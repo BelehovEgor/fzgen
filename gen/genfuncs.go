@@ -188,7 +188,7 @@ func emitIndependentWrapper(
 		v := wrappedSig.Params().At(i)
 		inputParams = append(inputParams, v)
 	}
-	if len(inputParams) == 0 {
+	if len(inputParams) == 0 && recv == nil {
 		// skip this wrapper, not useful for fuzzing if no inputs (no receiver, no parameters).
 		return fmt.Errorf("%w: %s has 0 input params", errNoFunctionsMatch, function.FuncName)
 	}
