@@ -152,6 +152,10 @@ func createNamedMock(
 	relativePackagePath string,
 	maxDepth int,
 ) {
+	if interfacesThatNeededMock.Obj() != nil && !interfacesThatNeededMock.Obj().Exported() {
+		return
+	}
+
 	switch u := interfacesThatNeededMock.Underlying().(type) {
 	case *types.Interface:
 		createInterfaceMock(interfacesThatNeededMock, created, depth, typeContext, qualifier, relativePackagePath, maxDepth)
@@ -216,6 +220,10 @@ func createInterfaceMock(
 	var supportedMethods []*types.Func
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
+		if !method.Exported() {
+			continue
+		}
+
 		sig := method.Type().(*types.Signature)
 
 		isSupported := true
