@@ -32,7 +32,8 @@ type Fuzzer struct {
 	t             *testing.T
 
 	// tech
-	used map[reflect.Value]bool
+	used                                 map[reflect.Value]bool
+	constructorsArePriorityForStructures bool
 }
 
 // NewFuzzer returns a *Fuzzer, initialized with the []byte as an input stream for drawing values via rand.Rand.
@@ -66,13 +67,18 @@ func NewFuzzer(data []byte) *Fuzzer {
 	return f
 }
 
-func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, t *testing.T) *Fuzzer {
+func NewFuzzerV2(data []byte,
+	typeFabricMap map[string][]reflect.Value,
+	t *testing.T,
+	constructorsArePriorityForStructures bool,
+) *Fuzzer {
 	fzgoSrc := &randSource{data}
 
 	f := &Fuzzer{
-		fzgoSrc:       fzgoSrc,
-		typeFabricMap: typeFabricMap,
-		t:             t,
+		fzgoSrc:                              fzgoSrc,
+		typeFabricMap:                        typeFabricMap,
+		t:                                    t,
+		constructorsArePriorityForStructures: true,
 	}
 
 	fzgoSrc.Byte()
@@ -701,9 +707,11 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 		var createStructUsingConstructor bool
 
 		if has {
-			f.Fill(&createStructUsingConstructor)
+			if !f.constructorsArePriorityForStructures {
+				f.Fill(&createStructUsingConstructor)
+			}
 
-			if createStructUsingConstructor {
+			if f.constructorsArePriorityForStructures || createStructUsingConstructor {
 				err := f.fillUsingFabric(v, depth, opts)
 				return err
 			}

@@ -8,17 +8,19 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 
 	"github.com/BelehovEgor/fzgen/gen/internal/mod"
 )
 
 type wrapperOptions struct {
-	qualifyAll         bool   // qualify all variables with package name
-	topComment         string // additional comment for top of generated file.
-	parallel           bool
-	requiredMocks      bool
-	mocksPackagePrefix string // helps mocks define mock imports
-	maxMockDepth       int
+	qualifyAll                           bool   // qualify all variables with package name
+	topComment                           string // additional comment for top of generated file.
+	parallel                             bool
+	requiredMocks                        bool
+	mocksPackagePrefix                   string // helps mocks define mock imports
+	maxMockDepth                         int
+	constructorsArePriorityForStructures bool
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -92,8 +94,7 @@ func emitIndependentWrappers(
 	var firstErr error
 	var success bool
 	for _, function := range pkgFuncs.Targets {
-		err := emitIndependentWrapper(
-			emit, function, typeContext, qualifier)
+		err := emitIndependentWrapper(emit, function, typeContext, qualifier, options)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -155,6 +156,7 @@ func emitIndependentWrapper(
 	function *mod.Func,
 	typeContext *mod.TypeContext,
 	qualifier *mod.ImportQualifier,
+	options wrapperOptions,
 ) error {
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
@@ -230,7 +232,10 @@ func emitIndependentWrapper(
 	}
 
 	fillErrVarName := varContext.CreateUniqueName("err")
-	emit("\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t)\n")
+	emit(
+		"\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t, %s)\n",
+		strconv.FormatBool(options.constructorsArePriorityForStructures),
+	)
 	emit("\t\t%s := fz.Fill2(", fillErrVarName)
 	for i, p := range paramReprs {
 		if i > 0 {

@@ -70,8 +70,14 @@ func NewFuzzer(data []byte, options ...FuzzerOpt) (fz *Fuzzer) {
 	}
 }
 
-func NewFuzzerV2(data []byte, typeFabricMap map[string][]reflect.Value, t *testing.T, options ...FuzzerOpt) (fz *Fuzzer) {
-	fill := randparam.NewFuzzerV2(data, typeFabricMap, t)
+func NewFuzzerV2(
+	data []byte,
+	typeFabricMap map[string][]reflect.Value,
+	t *testing.T,
+	constructorsArePriorityForStructures bool,
+	options ...FuzzerOpt,
+) (fz *Fuzzer) {
+	fill := randparam.NewFuzzerV2(data, typeFabricMap, t, constructorsArePriorityForStructures)
 	state := &execState{
 		reusableInputs: make(map[reflect.Type][]*reflect.Value),
 		outputSlots:    make(map[reflect.Type][]*outputSlot),

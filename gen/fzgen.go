@@ -31,7 +31,7 @@ import (
 // Usage contains short usage information.
 var Usage = `
 Usage:
-	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [-package] [-maxDepth]
+	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [-package] [-mocksDepth] [-prioritizeConstructors]
 	
 Running fzgen without any arguments targets the package in the current directory.
 
@@ -78,7 +78,9 @@ func FzgenMain() int {
 	// Mocks
 	mocksEnabled := flag.Bool("mocks", false, "generates mocks for all interfaces that can be argument of functions")
 	mocksPackagePrefix := flag.String("mocksPackagePrefix", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
-	maxDepth := flag.Int("mocks_depth", 3, "max mock depth (default: 3)")
+	maxDepth := flag.Int("mocksDepth", 3, "max mock depth (default: 3)")
+
+	prioritizeConstructors := flag.Bool("prioritizeConstructors", true, "Use constructors to populate structures in priority")
 
 	flag.Parse()
 
@@ -187,11 +189,12 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll:         qualifyAll,
-			topComment:         topComment,
-			requiredMocks:      *mocksEnabled,
-			mocksPackagePrefix: *mocksPackagePrefix,
-			maxMockDepth:       *maxDepth,
+			qualifyAll:                           qualifyAll,
+			topComment:                           topComment,
+			requiredMocks:                        *mocksEnabled,
+			mocksPackagePrefix:                   *mocksPackagePrefix,
+			maxMockDepth:                         *maxDepth,
+			constructorsArePriorityForStructures: *prioritizeConstructors,
 		}
 
 		// Do the actual work of emitting our wrappers.
