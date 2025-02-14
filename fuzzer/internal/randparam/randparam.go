@@ -731,7 +731,7 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 	case reflect.Ptr:
 		// create a zero value elem, then recursively fill that
 		v.Set(reflect.New(v.Type().Elem()))
-		f.fill(v.Elem(), depth, opts)
+		return f.fill(v.Elem(), depth, opts)
 	case reflect.Func:
 		success := f.fillFunc(v, depth, opts)
 		if !success && opts.panicOnUnsupported {
