@@ -19,7 +19,7 @@ func GenerateFabrics(
 	qualifier *ImportQualifier,
 	maxDepth int,
 ) map[string][]*GeneratedFunc {
-	generated := make(map[string][]*GeneratedFunc)
+	generated := make(map[string]map[string]*GeneratedFunc)
 
 	supportedInterfaces := make(map[string]*Interface)
 	for i := range typeContext.SupportedInterfaces {
@@ -34,7 +34,10 @@ func GenerateFabrics(
 	existedFuncs := typeContext.ExistedFuncs
 
 	emptyInterfaceFabrics := createFabricOfEmptyInterface(existedStructs, qualifier)
-	generated["interface{}"] = emptyInterfaceFabrics
+	generated["interface{}"] = make(map[string]*GeneratedFunc)
+	for _, f := range emptyInterfaceFabrics {
+		generated["interface{}"][f.Name] = f
+	}
 
 	for _, target := range targets {
 		for _, param := range target.Params() {
@@ -42,7 +45,14 @@ func GenerateFabrics(
 		}
 	}
 
-	return generated
+	result := make(map[string][]*GeneratedFunc)
+	for typeName, fabrics := range generated {
+		for _, fabric := range fabrics {
+			result[typeName] = append(result[typeName], fabric)
+		}
+	}
+
+	return result
 }
 
 func GenerateInitTestFunc(
@@ -121,7 +131,7 @@ func createFabrics(
 	supportedInterfaces map[string]*Interface,
 	existedFuncs []*Func,
 	maxDepth int,
-	generated map[string][]*GeneratedFunc,
+	generated map[string]map[string]*GeneratedFunc,
 	typeContext *TypeContext,
 ) {
 	if maxDepth == 0 {
@@ -142,7 +152,16 @@ func createFabrics(
 
 		baseFabrics := createTypeFabrics(base, qualifier, supportedInterfaces, existedFuncs, maxDepth)
 		if baseFabrics != nil {
-			generated[baseType] = baseFabrics
+			for _, value := range baseFabrics {
+				funcMap := generated[value.ReturnType]
+				if funcMap == nil {
+					funcMap = make(map[string]*GeneratedFunc)
+					generated[value.ReturnType] = funcMap
+				}
+
+				funcMap[value.Name] = value
+			}
+
 			typeContext.AddType(param.Type())
 		}
 	}
