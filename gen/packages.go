@@ -152,6 +152,12 @@ func getPackageContent(
 
 			switch t := obj.Type().(type) {
 			case *types.Named:
+				if t.TypeParams() != nil {
+					// TODO support generics
+					hasGenerics = true
+					continue
+				}
+
 				if types.IsInterface(t) {
 					i := &mod.Interface{
 						InterfaceName:  id.Name,
@@ -180,6 +186,17 @@ func getPackageContent(
 				hasGenerics = true
 			}
 		case *types.Func:
+			sig, ok := objType.Type().(*types.Signature)
+			if !ok {
+				continue
+			}
+
+			// Check if the function has type parameters
+			if sig.TypeParams() != nil || sig.Recv() != nil && isGeneric(sig.Recv()) {
+				hasGenerics = true
+				continue
+			}
+
 			f := mod.Func{
 				FuncName:  id.Name,
 				PkgName:   pkg.Name,
@@ -207,6 +224,15 @@ func getPackageContent(
 		Structs:    structs,
 		Interfaces: interfaces,
 	}, nil
+}
+
+func isGeneric(v *types.Var) bool {
+	named, err := namedType(v)
+	if err != nil {
+		return false
+	}
+
+	return named.TypeParams() != nil && named.TypeParams().Len() > 0
 }
 
 func addTarget(targets *[]*mod.Func, f *mod.Func, funcPattern *regexp.Regexp, flags findFuncFlag) error {
