@@ -209,6 +209,7 @@ func FzgenMain() int {
 		if err != nil {
 			fail(err)
 		}
+
 		generatedFiles++
 
 		if gen.MockeryYaml != nil {
@@ -255,7 +256,11 @@ func FzgenMain() int {
 		fmt.Println("fzgen: created", rel)
 	}
 
-	if generatedFiles > 1 {
+	switch generatedFiles {
+	case 0:
+		fmt.Printf("fzgen: no targets were found\n")
+	case 1:
+	default:
 		fmt.Printf("fzgen: created %d files\n", generatedFiles)
 	}
 
