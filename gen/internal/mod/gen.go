@@ -345,7 +345,7 @@ func createFabricOfFuncs(
 		emit("func %s() %s {\n", funcName, returnType)
 		emit("\treturn %s\n}\n", suitable[0].TypeString(qualifier.Qualifier))
 	} else {
-		emit("func %s(num int) %s {\n", funcName, returnType)
+		emit("func %s(num byte) %s {\n", funcName, returnType)
 		emit("\tswitch num %s %d {\n", "%", len(suitable))
 		for i, s := range suitable {
 			emit("\tcase %d:\n", i)
