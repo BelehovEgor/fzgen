@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"io"
 	"sort"
+	"strings"
 )
 
 type GeneratedFunc struct {
@@ -336,7 +337,7 @@ func createFabricOfFuncs(
 
 	Index++
 	funcName := fmt.Sprintf("fabric_func_%d", Index)
-	returnType := types.TypeString(signature, qualifier.Qualifier)
+	returnType := signatureToStringWithoutNames(signature, qualifier)
 	if named != nil {
 		returnType = types.TypeString(named, qualifier.Qualifier)
 	}
@@ -362,5 +363,45 @@ func createFabricOfFuncs(
 		ReturnType: returnType,
 		Type:       named,
 	}
+
 	return result
+}
+
+func signatureToStringWithoutNames(
+	sig *types.Signature,
+	qualifier *ImportQualifier,
+) string {
+	var params []string
+	tuple := sig.Params()
+	for i := 0; i < tuple.Len(); i++ {
+		param := tuple.At(i)
+
+		if i == tuple.Len()-1 && sig.Variadic() {
+			slice := param.Type().(*types.Slice)
+
+			params = append(params, fmt.Sprintf("...%s", types.TypeString(slice.Elem(), qualifier.Qualifier)))
+		} else {
+			params = append(params, types.TypeString(param.Type(), qualifier.Qualifier))
+		}
+	}
+
+	var results []string
+	resultTuple := sig.Results()
+	for i := 0; i < resultTuple.Len(); i++ {
+		result := resultTuple.At(i)
+		results = append(results, types.TypeString(result.Type(), qualifier.Qualifier))
+	}
+
+	paramStr := strings.Join(params, ", ")
+	resultStr := strings.Join(results, ", ")
+
+	if resultTuple.Len() > 1 {
+		resultStr = "(" + resultStr + ")"
+	}
+
+	if resultStr == "" {
+		return strings.ReplaceAll(fmt.Sprintf("func(%s)", paramStr), " ", "")
+	}
+
+	return strings.ReplaceAll(fmt.Sprintf("func(%s) %s", paramStr, resultStr), " ", "")
 }

@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -291,7 +292,7 @@ func (f *Fuzzer) fillFunc(reflectValue reflect.Value, depth int, opts fillOpts) 
 		return false
 	}
 
-	typeName := reflectValue.Type().String()
+	typeName := strings.ReplaceAll(reflectValue.Type().String(), " ", "")
 	fabrics, has := f.typeFabricMap[typeName]
 	if !has || len(fabrics) == 0 {
 		return false

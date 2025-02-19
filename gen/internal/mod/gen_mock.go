@@ -325,7 +325,7 @@ func createFuncMock(
 		return nil
 	}
 
-	sigTypeString := types.TypeString(signatureThatNeededMock, qualifier.Qualifier)
+	sigTypeString := signatureToStringWithoutNames(signatureThatNeededMock, qualifier)
 
 	var returnType string
 	if namedType != nil {
