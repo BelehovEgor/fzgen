@@ -8,19 +8,19 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strconv"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/BelehovEgor/fzgen/gen/internal/mod"
 )
 
 type wrapperOptions struct {
-	qualifyAll                           bool   // qualify all variables with package name
-	topComment                           string // additional comment for top of generated file.
-	parallel                             bool
-	requiredMocks                        bool
-	mocksPackagePrefix                   string // helps mocks define mock imports
-	maxMockDepth                         int
-	constructorsArePriorityForStructures bool
+	qualifyAll             bool   // qualify all variables with package name
+	topComment             string // additional comment for top of generated file.
+	parallel               bool
+	requiredMocks          bool
+	mocksPackagePrefix     string // helps mocks define mock imports
+	maxMockDepth           int
+	constructorFillingMode fuzzer.ConstructorFillingMode
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -232,9 +232,19 @@ func emitIndependentWrapper(
 	}
 
 	fillErrVarName := varContext.CreateUniqueName("err")
+
+	var mode string
+	switch options.constructorFillingMode {
+	case fuzzer.Constructors:
+		mode = "fuzzer.Constructors"
+	case fuzzer.ConstructorsAndRandom:
+		mode = "fuzzer.ConstructorsAndRandom"
+	case fuzzer.Random:
+		mode = "fuzzer.Random"
+	}
 	emit(
 		"\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t, %s)\n",
-		strconv.FormatBool(options.constructorsArePriorityForStructures),
+		mode,
 	)
 	emit("\t\t%s := fz.Fill2(", fillErrVarName)
 	for i, p := range paramReprs {

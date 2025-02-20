@@ -27,6 +27,14 @@ import (
 	"github.com/sanity-io/litter"
 )
 
+type ConstructorFillingMode string
+
+const (
+	Constructors          ConstructorFillingMode = "Constructors"
+	Random                ConstructorFillingMode = "Random"
+	ConstructorsAndRandom ConstructorFillingMode = "ConstructorsAndRandom"
+)
+
 // Step describes an operation to step the system forward.
 // Func can take any number of arguments and return any number of values.
 // The Name string conventionally should be an acceptable func identifier.
@@ -74,10 +82,25 @@ func NewFuzzerV2(
 	data []byte,
 	typeFabricMap map[string][]reflect.Value,
 	t *testing.T,
-	constructorsArePriorityForStructures bool,
+	structFillingMode ConstructorFillingMode,
 	options ...FuzzerOpt,
 ) (fz *Fuzzer) {
-	fill := randparam.NewFuzzerV2(data, typeFabricMap, t, constructorsArePriorityForStructures)
+	var mode randparam.StructFillingMode
+	switch structFillingMode {
+	case Constructors:
+		mode = randparam.ConstructorPriority
+	case ConstructorsAndRandom:
+		mode = randparam.ConstructorAndRandom
+	case Random:
+		mode = randparam.Random
+	}
+
+	fill := randparam.NewFuzzerV2(
+		data,
+		typeFabricMap,
+		t,
+		mode,
+	)
 	state := &execState{
 		reusableInputs: make(map[reflect.Type][]*reflect.Value),
 		outputSlots:    make(map[reflect.Type][]*outputSlot),
