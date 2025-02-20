@@ -85,7 +85,7 @@ func FzgenMain() int {
 
 	// Struct filling
 	var constructorFillingMode string
-	flag.StringVar(&constructorFillingMode, "constructorFillingMode", string(fuzzer.Constructors), "Constructor filling mode (Constructors, Random, ConstructorsAndRandom)")
+	flag.StringVar(&constructorFillingMode, "structFillMode", string(fuzzer.Constructors), "Constructor filling mode (Constructors, Random, ConstructorsAndRandom)")
 
 	flag.Parse()
 
