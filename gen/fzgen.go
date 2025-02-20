@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/BelehovEgor/fzgen/fuzzer"
 	"golang.org/x/tools/imports"
 )
 
@@ -31,7 +32,9 @@ import (
 // Usage contains short usage information.
 var Usage = `
 Usage:
-	fzgen [-chain] [-parallel] [-ctor=<target-constructor-regexp>] [-unexported] [-mocks] [-mocksPackagePrefix] [-package] [-mocksDepth] [-prioritizeConstructors]
+	fzgen [-chain] [-parallel] 
+		[-ctor=<target-constructor-regexp>] [-unexported] 
+		[-mocks] [-mocksPackagePrefix] [-package] [-mocksDepth] [-structFillMode]
 	
 Running fzgen without any arguments targets the package in the current directory.
 
@@ -80,7 +83,9 @@ func FzgenMain() int {
 	mocksPackagePrefix := flag.String("mocksPackagePrefix", "", "the package of the module from which fzgen is launche ({moduleName}/{folder struct})")
 	maxDepth := flag.Int("mocksDepth", 3, "max mock depth (default: 3)")
 
-	prioritizeConstructors := flag.Bool("prioritizeConstructors", true, "Use constructors to populate structures in priority")
+	// Struct filling
+	var constructorFillingMode string
+	flag.StringVar(&constructorFillingMode, "constructorFillingMode", string(fuzzer.Constructors), "Constructor filling mode (Constructors, Random, ConstructorsAndRandom)")
 
 	flag.Parse()
 
@@ -189,12 +194,12 @@ func FzgenMain() int {
 		}
 
 		wrapperOpts := wrapperOptions{
-			qualifyAll:                           qualifyAll,
-			topComment:                           topComment,
-			requiredMocks:                        *mocksEnabled,
-			mocksPackagePrefix:                   *mocksPackagePrefix,
-			maxMockDepth:                         *maxDepth,
-			constructorsArePriorityForStructures: *prioritizeConstructors,
+			qualifyAll:             qualifyAll,
+			topComment:             topComment,
+			requiredMocks:          *mocksEnabled,
+			mocksPackagePrefix:     *mocksPackagePrefix,
+			maxMockDepth:           *maxDepth,
+			constructorFillingMode: fuzzer.ConstructorFillingMode(constructorFillingMode),
 		}
 
 		// Do the actual work of emitting our wrappers.

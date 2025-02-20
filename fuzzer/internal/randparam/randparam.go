@@ -24,6 +24,14 @@ import (
 	"testing"
 )
 
+type StructFillingMode int
+
+const (
+	ConstructorPriority StructFillingMode = iota
+	ConstructorAndRandom
+	Random
+)
+
 // Fuzzer generates random values for public members.
 // It allows wiring together cmd/go fuzzing or dvyukov/go-fuzz (for randomness, instrumentation, managing corpus, etc.)
 // with the ability to fill in common interfaces, as well as string, []byte, and number values.
@@ -33,8 +41,8 @@ type Fuzzer struct {
 	t             *testing.T
 
 	// tech
-	used                                 map[reflect.Value]bool
-	constructorsArePriorityForStructures bool
+	used              map[reflect.Value]bool
+	structFillingMode StructFillingMode
 }
 
 // NewFuzzer returns a *Fuzzer, initialized with the []byte as an input stream for drawing values via rand.Rand.
@@ -71,15 +79,15 @@ func NewFuzzer(data []byte) *Fuzzer {
 func NewFuzzerV2(data []byte,
 	typeFabricMap map[string][]reflect.Value,
 	t *testing.T,
-	constructorsArePriorityForStructures bool,
+	structFillingMode StructFillingMode,
 ) *Fuzzer {
 	fzgoSrc := &randSource{data}
 
 	f := &Fuzzer{
-		fzgoSrc:                              fzgoSrc,
-		typeFabricMap:                        typeFabricMap,
-		t:                                    t,
-		constructorsArePriorityForStructures: true,
+		fzgoSrc:           fzgoSrc,
+		typeFabricMap:     typeFabricMap,
+		t:                 t,
+		structFillingMode: structFillingMode,
 	}
 
 	fzgoSrc.Byte()
@@ -285,6 +293,15 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	}
 
 	return nil
+}
+
+func (f *Fuzzer) fillFields(reflectValue reflect.Value, depth int, opts fillOpts) {
+	for i := 0; i < reflectValue.NumField(); i++ {
+		if reflectValue.Field(i).CanSet() {
+			// TODO: could consider option for unexported fields
+			f.fill(reflectValue.Field(i), depth, opts)
+		}
+	}
 }
 
 func (f *Fuzzer) fillFunc(reflectValue reflect.Value, depth int, opts fillOpts) bool {
@@ -704,27 +721,33 @@ func (f *Fuzzer) fill(v reflect.Value, depth int, opts fillOpts) error {
 		}
 	case reflect.Struct:
 		typeName := v.Type().String()
-		_, has := f.typeFabricMap[typeName]
-		var createStructUsingConstructor bool
 
-		if has {
-			if !f.constructorsArePriorityForStructures {
-				f.Fill(&createStructUsingConstructor)
-			}
-
-			if f.constructorsArePriorityForStructures || createStructUsingConstructor {
+		switch f.structFillingMode {
+		case ConstructorPriority:
+			_, has := f.typeFabricMap[typeName]
+			if has {
 				err := f.fillUsingFabric(v, depth, opts)
 				return err
+			} else {
+				f.fillFields(v, depth+1, opts)
 			}
-		}
+		case ConstructorAndRandom:
+			_, has := f.typeFabricMap[typeName]
+			if !has {
+				f.fillFields(v, depth+1, opts)
+			} else {
+				var createStructUsingConstructor bool
+				f.Fill(&createStructUsingConstructor)
 
-		if !has || !createStructUsingConstructor {
-			for i := 0; i < v.NumField(); i++ {
-				if v.Field(i).CanSet() {
-					// TODO: could consider option for unexported fields
-					f.fill(v.Field(i), depth, opts)
+				if createStructUsingConstructor {
+					err := f.fillUsingFabric(v, depth, opts)
+					return err
+				} else {
+					f.fillFields(v, depth+1, opts)
 				}
 			}
+		case Random:
+			f.fillFields(v, depth+1, opts)
 		}
 	case reflect.Interface:
 		err := f.fillInterface(v, depth, opts)
