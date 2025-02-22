@@ -39,6 +39,6 @@ func Target(s StructWithComplexField) {
 
 }
 
-func NewMyPrinter() MyPrinter {
+func NotewMyPrinter() MyPrinter {
 	return MyPrinter{}
 }

@@ -12,6 +12,10 @@ func Log(emit EmitFunc, lvl int, log string) {
 	emit(lvl, log)
 }
 
+func LogV2(emit func(lvl int, format string, args ...interface{}), lvl int, log string) {
+	emit(lvl, log)
+}
+
 func MyEmitter(lvl int, format string, args ...interface{}) {
 	fmt.Printf(format, args...)
 }
