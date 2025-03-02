@@ -269,7 +269,7 @@ func emitIndependentWrapper(
 	emit("}\n\n")
 
 	algoritmicCode := buf.String()
-	if !options.llmEnabled {
+	if !options.llmEnabled || function.AstFuncDecl == nil {
 		return algoritmicCode, nil
 	}
 
