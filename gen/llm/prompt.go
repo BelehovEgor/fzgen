@@ -29,6 +29,11 @@ var (
 	
 		%s
 
+		Current import aliases:
+
+		%s
+
+
 		Return new fuzzing target, that process all available func call results 
 
 		Requirements:
@@ -38,6 +43,7 @@ var (
 		+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
 		+ handle only possible exceptions, the rest should be thrown above
 		+ situations that should not occur during the execution of the function should end with t.Error
+		+ don't use not exported fields in validation checks
 	`
 
 	patternTargetFuzz string = `
@@ -53,6 +59,10 @@ var (
 
 		%s
 
+		Current import aliases:
+
+		%s
+
 		Return new fuzzing target, that process all available func call results 
 
 		Requirements:
@@ -62,6 +72,7 @@ var (
 		+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
 		+ handle only possible exceptions, the rest should be thrown above
 		+ situations that should not occur during the execution of the function should end with t.Error
+		+ don't use not exported fields in validation checks
 	`
 
 	patternTarget string = `
@@ -80,7 +91,7 @@ var (
 		+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
 		+ handle only possible exceptions, the rest should be thrown above
 		+ situations that should not occur during the execution of the function should end with t.Error
-		+ as text, without code formating
+		+ don't use not exported fields in validation checks
 	`
 )
 
@@ -88,18 +99,28 @@ func CreatePrompt(
 	fset *token.FileSet,
 	target *mod.Func,
 	fuzzTarget string,
+	qualifier *mod.ImportQualifier,
 ) string {
 	if len(fuzzTarget) == 0 {
-		return fmt.Sprintf(patternTarget, GetSourceCode(target.AstFuncDecl, fset))
+		return fmt.Sprintf(patternTarget, getSourceCode(target.AstFuncDecl, fset), getImports(qualifier))
 	}
 
-	return fmt.Sprintf(patternTargetFuzz, GetSourceCode(target.AstFuncDecl, fset), fuzzTarget)
+	return fmt.Sprintf(patternTargetFuzz, getSourceCode(target.AstFuncDecl, fset), fuzzTarget)
 }
 
-func GetSourceCode(target *ast.FuncDecl, fset *token.FileSet) string {
+func getSourceCode(target *ast.FuncDecl, fset *token.FileSet) string {
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, fset, target); err != nil {
 		log.Fatalf("Failed to print function declaration: %v", err)
 	}
+	return buf.String()
+}
+
+func getImports(qualifier *mod.ImportQualifier) string {
+	buf, emit := mod.CreateEmmiter()
+	for _, str := range qualifier.GetImportStrings() {
+		emit("%s\n", str)
+	}
+
 	return buf.String()
 }
