@@ -11,8 +11,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/fzgen/main.go",
             "args": [
-                "--ctor=New*",
-                "--constructorFillingMode=ConstructorsAndRandom",
+                "-llm",
                 "github.com/BelehovEgor/fzgen/examples/inputs/1-supported-func"
             ]
         }
