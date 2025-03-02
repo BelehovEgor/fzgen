@@ -2,16 +2,19 @@ package mod
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 )
 
 // Func represents a discovered function that will be fuzzed.
 type Func struct {
-	FuncName  string
-	PkgName   string      // package name (should be the same as the package's package statement)
-	PkgPath   string      // import path
-	PkgDir    string      // local on-disk directory
-	TypesFunc *types.Func // auxiliary information about a Func from the go/types package
+	FuncName    string
+	PkgName     string        // package name (should be the same as the package's package statement)
+	PkgPath     string        // import path
+	PkgDir      string        // local on-disk directory
+	TypesFunc   *types.Func   // auxiliary information about a Func from the go/types package
+	AstFuncDecl *ast.FuncDecl // ast func declaration
+	Uses        []*ast.FuncDecl
 }
 
 type Constructor struct {

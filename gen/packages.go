@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"os"
 	"os/exec"
@@ -197,16 +198,21 @@ func getPackageContent(
 				continue
 			}
 
+			funcDecl := id.Obj.Decl.(*ast.FuncDecl)
+
 			f := mod.Func{
-				FuncName:  id.Name,
-				PkgName:   pkg.Name,
-				PkgPath:   pkg.PkgPath,
-				PkgDir:    pkgDir,
-				TypesFunc: objType,
+				FuncName:    id.Name,
+				PkgName:     pkg.Name,
+				PkgPath:     pkg.PkgPath,
+				PkgDir:      pkgDir,
+				TypesFunc:   objType,
+				AstFuncDecl: funcDecl,
 			}
 
 			funcs = append(funcs, &f)
 			typeContext.AddFunc(&f)
+
+			// findUsages(objType, pkg)
 
 			addTarget(&targets, &f, funcPattern, flags)
 		}
@@ -223,6 +229,8 @@ func getPackageContent(
 		Funcs:      funcs,
 		Structs:    structs,
 		Interfaces: interfaces,
+
+		Fset: pkg.Fset,
 	}, nil
 }
 
