@@ -274,7 +274,7 @@ func emitIndependentWrapper(
 	}
 
 	llmClient := &llm.OpenRouterClient{}
-	result, err := llmClient.Call(llm.CreatePrompt(fset, function, algoritmicCode))
+	result, err := llmClient.Call(llm.CreatePrompt(fset, function, algoritmicCode, qualifier))
 	if err != nil {
 		return algoritmicCode, nil
 	}
