@@ -197,16 +197,18 @@ func getPackageContent(
 				hasGenerics = true
 				continue
 			}
-
-			funcDecl := id.Obj.Decl.(*ast.FuncDecl)
-
 			f := mod.Func{
-				FuncName:    id.Name,
-				PkgName:     pkg.Name,
-				PkgPath:     pkg.PkgPath,
-				PkgDir:      pkgDir,
-				TypesFunc:   objType,
-				AstFuncDecl: funcDecl,
+				FuncName:  id.Name,
+				PkgName:   pkg.Name,
+				PkgPath:   pkg.PkgPath,
+				PkgDir:    pkgDir,
+				TypesFunc: objType,
+			}
+
+			if id.Obj != nil && id.Obj.Decl != nil {
+				if funcDecl, ok := id.Obj.Decl.(*ast.FuncDecl); ok {
+					f.AstFuncDecl = funcDecl
+				}
 			}
 
 			funcs = append(funcs, &f)

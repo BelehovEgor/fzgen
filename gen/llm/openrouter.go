@@ -65,14 +65,20 @@ func (client *OpenRouterClient) Call(prompt string) (string, error) {
 
 	// Parse the response
 	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil || result == nil {
 		return "", fmt.Errorf("error unmarshaling response: %s", err.Error())
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Extract and print the completion content
-	choices := result["choices"].([]interface{})
+	choises_interface, ok := result["choices"]
+	if !ok {
+		return "", fmt.Errorf("error getting result")
+	}
+
+	choices := choises_interface.([]interface{})
+
 	if len(choices) > 0 {
 		firstChoice := choices[0].(map[string]interface{})
 		message := firstChoice["message"].(map[string]interface{})
