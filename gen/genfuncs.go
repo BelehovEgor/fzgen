@@ -18,7 +18,7 @@ type wrapperOptions struct {
 	topComment             string // additional comment for top of generated file.
 	parallel               bool
 	requiredMocks          bool
-	llmEnabled             bool
+	llmClient              string
 	mocksPackagePrefix     string // helps mocks define mock imports
 	maxMockDepth           int
 	constructorFillingMode fuzzer.ConstructorFillingMode
@@ -269,11 +269,11 @@ func emitIndependentWrapper(
 	emit("}\n\n")
 
 	algoritmicCode := buf.String()
-	if !options.llmEnabled || function.AstFuncDecl == nil {
+	if options.llmClient == "" || function.AstFuncDecl == nil {
 		return algoritmicCode, nil
 	}
 
-	llmClient := &llm.OpenRouterClient{}
+	llmClient := llm.GetClient(options.llmClient)
 	result, err := llmClient.Call(llm.CreatePrompt(fset, function, algoritmicCode, qualifier))
 	if err != nil {
 		return algoritmicCode, nil

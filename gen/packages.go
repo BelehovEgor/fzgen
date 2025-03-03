@@ -214,8 +214,6 @@ func getPackageContent(
 			funcs = append(funcs, &f)
 			typeContext.AddFunc(&f)
 
-			// findUsages(objType, pkg)
-
 			addTarget(&targets, &f, funcPattern, flags)
 		}
 	}
@@ -223,6 +221,9 @@ func getPackageContent(
 	if hasGenerics {
 		fmt.Println("Warning! Generics not supported")
 	}
+
+	// TODO: do it only if llm requested
+	findUsages(pkg, targets)
 
 	return &mod.Package{
 		PkgName:    pkg.Name,
@@ -414,4 +415,45 @@ func isInterfaceRecv(f *types.Func) bool {
 
 	_, ok = recv.Type().Underlying().(*types.Signature)
 	return ok
+}
+
+func findUsages(pkg *packages.Package, targets []*mod.Func) {
+	targetsMap := make(map[string]*mod.Func)
+	for _, tar := range targets {
+		targetsMap[tar.FuncName] = tar
+	}
+
+	for _, syntax := range pkg.Syntax {
+		ast.Inspect(syntax, func(n ast.Node) bool {
+			// Check if the node is a function declaration
+			fn, ok := n.(*ast.FuncDecl)
+			if !ok {
+				return true
+			}
+
+			// Traverse the function body to find calls to the target function
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				// Check if the node is a function call
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+
+				ident, ok := call.Fun.(*ast.Ident)
+				if !ok {
+					return true
+				}
+
+				// Check if the function being called is the target function
+				if target, has := targetsMap[ident.Name]; has {
+					target.Uses = append(target.Uses, fn)
+					return false
+				}
+
+				return true
+			})
+
+			return false
+		})
+	}
 }
