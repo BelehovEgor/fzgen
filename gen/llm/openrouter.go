@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -15,7 +16,7 @@ type OpenRouterClient struct {
 
 func (client *OpenRouterClient) Call(prompt string) (string, error) {
 	baseURL := "https://openrouter.ai/api/v1"
-	apiKey := "your key"
+	apiKey := os.Getenv("openrouter_api_key")
 
 	// Define the request payload
 	payload := map[string]interface{}{
@@ -58,7 +59,7 @@ func (client *OpenRouterClient) Call(prompt string) (string, error) {
 	defer resp.Body.Close()
 
 	// Read the response
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error reading response: %s", err.Error())
 	}

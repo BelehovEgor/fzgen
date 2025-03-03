@@ -1,5 +1,7 @@
 package llm
 
+import "fmt"
+
 type Client interface {
 	Call(prompt string) (string, error)
 	CallAndCheck(prompt string, check func(string) error) (string, error)
@@ -9,21 +11,7 @@ type MockClient struct {
 }
 
 func (client *MockClient) Call(prompt string) (string, error) {
-	return `
-		func Fuzz_Mock(f *testing.F) {
-			f.Fuzz(func(t *testing.T, data []byte) {
-				var s *jwt.ClaimStrings
-				var data_0 []byte
-				fz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t, fuzzer.Constructors)
-				err := fz.Fill2(&s, &data_0)
-				if err != nil || s == nil {
-					return
-				}
-
-				s.UnmarshalJSON(data_0)
-			})
-		}
-	`, nil
+	return "", fmt.Errorf("it is mock client")
 }
 
 func (client *MockClient) CallAndCheck(prompt string, check func(string) error) (string, error) {
@@ -37,4 +25,15 @@ func (client *MockClient) CallAndCheck(prompt string, check func(string) error) 
 	}
 
 	return result, nil
+}
+
+func GetClient(clientName string) Client {
+	switch clientName {
+	case "openrouter":
+		return &OpenRouterClient{}
+	case "mock":
+		return &MockClient{}
+	default:
+		panic("unimplemented client")
+	}
 }
