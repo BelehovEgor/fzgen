@@ -432,7 +432,7 @@ func findUsages(pkg *packages.Package, targets []*mod.Func) {
 			}
 
 			// Traverse the function body to find calls to the target function
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
+			ast.Inspect(fn, func(n ast.Node) bool {
 				// Check if the node is a function call
 				call, ok := n.(*ast.CallExpr)
 				if !ok {
