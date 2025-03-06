@@ -276,6 +276,8 @@ func emitIndependentWrapper(
 	llmClient := llm.GetClient(options.llmClient)
 	result, err := llmClient.Call(llm.CreatePrompt(fset, function, algoritmicCode, qualifier))
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "genfuzzfuncs: warning: error while calling LLM: %v\n", err)
+
 		return algoritmicCode, nil
 	}
 

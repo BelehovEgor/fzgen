@@ -36,7 +36,8 @@ Current import aliases:
 Return new fuzzing target, that process all available func call results 
 
 Requirements:
-+ only code
++ only fuzz target code
++ without imports
 + no explanation
 + process all edge cases
 + if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
@@ -65,7 +66,8 @@ Current import aliases:
 Return new fuzzing target, that process all available func call results 
 
 Requirements:
-+ only code
++ only fuzz target code
++ without imports
 + no explanation
 + process all edge cases
 + if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
@@ -84,7 +86,8 @@ Purpose: generate fuzz target func for function:
 Return new fuzzing target, that process all available func call results 
 
 Requirements:
-+ only code
++ only fuzz target code
++ without imports
 + no explanation
 + process all edge cases
 + if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
