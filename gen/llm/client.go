@@ -31,6 +31,8 @@ func GetClient(clientName string) Client {
 	switch clientName {
 	case "openrouter":
 		return &OpenRouterClient{}
+	case "gigachat":
+		return &GigachatClient{}
 	case "mock":
 		return &MockClient{}
 	default:
