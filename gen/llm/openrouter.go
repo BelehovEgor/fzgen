@@ -23,13 +23,12 @@ func (client *OpenRouterClient) Call(prompt string) (string, error) {
 		"model": "qwen/qwen2.5-vl-72b-instruct:free",
 		"messages": []map[string]interface{}{
 			{
-				"role": "user",
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": prompt,
-					},
-				},
+				"role":    "system",
+				"content": "you are a professional golang developer who completes fuzzing tests",
+			},
+			{
+				"role":    "user",
+				"content": prompt,
 			},
 		},
 	}
@@ -70,7 +69,7 @@ func (client *OpenRouterClient) Call(prompt string) (string, error) {
 		return "", fmt.Errorf("error unmarshaling response: %s", err.Error())
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(time.Second)
 
 	// Extract and print the completion content
 	choises_interface, ok := result["choices"]
