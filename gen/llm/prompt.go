@@ -23,10 +23,7 @@ Requirements:
 + if arguments is invalid, target function shouldn't be call, this case should be skipped
 + if there is an explicit exception creation, skip only them by their message, the rest should cause a fuzzing test error
 + situations that should not occur during the execution of the function should end with t.Error
-+ use %v for format string with variables. Example
-	+ t.Error("Simple error)
-	+ t.Error("Unexpected error type: %v", variable)
-	+ t.Logf("Info: %v %v", variable1, variable2)
++ use simple strings for t.Error or t.Log without any variables format
 + don't use not exported fields in validation checks
 + use UTF-8
 	`
