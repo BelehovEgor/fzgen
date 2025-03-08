@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -69,7 +70,10 @@ func (client *OpenRouterClient) Call(prompt string) (string, error) {
 		return "", fmt.Errorf("error unmarshaling response: %s", err.Error())
 	}
 
-	time.Sleep(time.Second)
+	timeout, err := strconv.Atoi(os.Getenv("timeout"))
+	if err == nil || timeout > 0 {
+		time.Sleep(time.Duration(timeout) * time.Second)
+	}
 
 	// Extract and print the completion content
 	choises_interface, ok := result["choices"]
