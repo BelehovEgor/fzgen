@@ -12,10 +12,28 @@ import (
 )
 
 var (
+	commonRequirements = `
+Return new fuzzing target, that process all invalid func call results as error
+
+Requirements:
++ return only fuzz target code
++ without imports
++ no explanation
++ process all edge cases
++ if arguments is invalid, target function shouldn't be call, this case should be skipped without log
++ if there is an explicit exception creation, skip only them, the rest should cause a fuzzing test error
++ situations that should not occur during the execution of the function should end with t.Error
++ don't use not exported fields in validation checks
++ !MISSING in example is problem of encoding, don't use it in result
++ use UTF-8
+	`
+
 	patternTargetUseFuzz string = `
 You write fuzzing test using golang
 
 Purpose: extend target func result check in fuzzing target 
+
+%s
 
 Target func:
 
@@ -32,24 +50,14 @@ Current fuzzing target test:
 Current import aliases:
 
 %s
-
-Return new fuzzing target, that process all available func call results 
-
-Requirements:
-+ only fuzz target code
-+ without imports
-+ no explanation
-+ process all edge cases
-+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
-+ if there is an explicit exception creation, skip only them, the rest should cause a fuzzing test error
-+ situations that should not occur during the execution of the function should end with t.Error
-+ don't use not exported fields in validation checks
 	`
 
 	patternTargetFuzz string = `
 You write fuzzing test using golang
 
 Purpose: extend target func result check in fuzzing target 
+
+%s
 
 Target func:
 
@@ -62,38 +70,18 @@ Current fuzzing target test:
 Current import aliases:
 
 %s
-
-Return new fuzzing target, that process all available func call results 
-
-Requirements:
-+ only fuzz target code
-+ without imports
-+ no explanation
-+ process all edge cases
-+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
-+ if there is an explicit exception creation, skip only them, the rest should cause a fuzzing test error.
-+ situations that should not occur during the execution of the function should end with t.Error
-+ don't use not exported fields in validation checks
 	`
 
 	patternTarget string = `
 You write fuzzing test using golang
 
+%s
+
 Purpose: generate fuzz target func for function:
 
 %s
 
-Return new fuzzing target, that process all available func call results 
-
-Requirements:
-+ only fuzz target code
-+ without imports
-+ no explanation
-+ process all edge cases
-+ if arguments is invalid, target function shouldn't be call, this case should be skipped and logged 
-+ if there is an explicit exception creation, skip only them, the rest should cause a fuzzing test error.
-+ situations that should not occur during the execution of the function should end with t.Error
-+ don't use not exported fields in validation checks
+%s
 	`
 )
 
@@ -104,11 +92,11 @@ func CreatePrompt(
 	qualifier *mod.ImportQualifier,
 ) string {
 	if len(fuzzTarget) == 0 {
-		return fmt.Sprintf(patternTarget, getSourceCode(target.AstFuncDecl, fset))
+		return fillTemplate(patternTarget, getSourceCode(target.AstFuncDecl, fset))
 	}
 
 	if len(target.Uses) > 0 {
-		return fmt.Sprintf(
+		return fillTemplate(
 			patternTargetUseFuzz,
 			getSourceCode(target.AstFuncDecl, fset),
 			getSourceCode(target.Uses[0], fset),
@@ -117,7 +105,7 @@ func CreatePrompt(
 		)
 	}
 
-	return fmt.Sprintf(patternTargetFuzz, getSourceCode(target.AstFuncDecl, fset), fuzzTarget, getImports(qualifier))
+	return fillTemplate(patternTargetFuzz, getSourceCode(target.AstFuncDecl, fset), fuzzTarget, getImports(qualifier))
 }
 
 func getSourceCode(target *ast.FuncDecl, fset *token.FileSet) string {
@@ -135,4 +123,8 @@ func getImports(qualifier *mod.ImportQualifier) string {
 	}
 
 	return buf.String()
+}
+
+func fillTemplate(template string, a ...any) string {
+	return fmt.Sprintf(template, commonRequirements, a)
 }

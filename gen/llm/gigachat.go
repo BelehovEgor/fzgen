@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -70,6 +71,11 @@ func (client *GigachatClient) Call(prompt string) (string, error) {
 		return "", err
 	}
 	defer res.Body.Close()
+
+	timeout, err := strconv.Atoi(os.Getenv("timeout"))
+	if err == nil || timeout > 0 {
+		time.Sleep(time.Duration(timeout) * time.Second)
+	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
