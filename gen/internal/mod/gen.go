@@ -120,7 +120,11 @@ func CreateEmmiter() (*bytes.Buffer, func(format string, args ...interface{})) {
 	buf := new(bytes.Buffer)
 	var w io.Writer = buf
 	emit := func(format string, args ...interface{}) {
-		fmt.Fprintf(w, format, args...)
+		if len(args) == 0 {
+			fmt.Fprint(w, format)
+		} else {
+			fmt.Fprintf(w, format, args...)
+		}
 	}
 
 	return buf, emit
