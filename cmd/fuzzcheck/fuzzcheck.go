@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -43,15 +44,21 @@ func main() {
 
 	// Step 4: Run each fuzz target for 10 seconds
 	successCount := 0
+	interCount := 0
+	totalCount := 0
 	for _, target := range fuzzTargets {
-		if runFuzzTarget(filename, target, 10*time.Second) {
+		success, inter, total := runFuzzTarget(filename, target, 60*time.Second)
+		interCount += inter
+		totalCount += total
+
+		if success {
 			successCount++
 		}
 	}
 
 	// Step 5: Report results
 	fmt.Printf("File is valid: true\n")
-	fmt.Printf("Successful fuzz tests: %d/%d\n", successCount, len(fuzzTargets))
+	fmt.Printf("Successful fuzz tests: %d/%d; new interesting/total %d/%d\n", successCount, len(fuzzTargets), interCount, totalCount)
 }
 
 // getFuzzTargets extracts all fuzz target function names from the Go file content.
@@ -77,7 +84,7 @@ func getFuzzTargets(content []byte) []string {
 }
 
 // runFuzzTarget runs a specific fuzz target for a given duration.
-func runFuzzTarget(filename, target string, duration time.Duration) bool {
+func runFuzzTarget(filename, target string, duration time.Duration) (bool, int, int) {
 	dir := filepath.Dir(filename)
 	cmd := exec.Command("go", "test", "-fuzz", fmt.Sprintf("^%s$", target), "-fuzztime", duration.String())
 	cmd.Dir = dir
@@ -87,14 +94,19 @@ func runFuzzTarget(filename, target string, duration time.Duration) bool {
 
 	fmt.Printf("Running fuzz target %s for %s...\n", target, duration)
 	err := cmd.Run()
+
+	interesting, total := getLastInterestingAndTotal(out.String())
+
 	if err != nil {
 		fmt.Printf("Fuzz target %s failed: %s\n", target, err)
 		fmt.Println(out.String())
 		cleanupError()
-		return false
+		return false, interesting, total
 	}
+
 	fmt.Printf("Fuzz target %s succeeded.\n", target)
-	return true
+
+	return true, interesting, total
 }
 
 func cleanupError() {
@@ -108,4 +120,38 @@ func cleanupError() {
 	} else {
 		fmt.Println("Successfully removed testdata directory")
 	}
+}
+
+func getLastInterestingAndTotal(log string) (int, int) {
+	// Define a regular expression to match the "new interesting" and "total" values
+	re := regexp.MustCompile(`new interesting: (\d+) \(total: (\d+)\)`)
+
+	// Split the log into lines
+	lines := strings.Split(log, "\n")
+
+	// Iterate over the lines in reverse order to find the last occurrence
+	for i := len(lines) - 1; i >= 0; i-- {
+		matches := re.FindStringSubmatch(lines[i])
+		if len(matches) == 3 {
+			// Extract the "new interesting" and "total" values
+			newInteresting := matches[1]
+			total := matches[2]
+
+			// Convert the extracted strings to integers
+			var newInterestingInt, totalInt int
+			_, err := fmt.Sscanf(newInteresting, "%d", &newInterestingInt)
+			if err != nil {
+				return 0, 0
+			}
+			_, err = fmt.Sscanf(total, "%d", &totalInt)
+			if err != nil {
+				return 0, 0
+			}
+
+			return newInterestingInt, totalInt
+		}
+	}
+
+	// If no match is found, return an error
+	return 0, 0
 }
