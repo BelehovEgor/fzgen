@@ -13,19 +13,16 @@ import (
 
 var (
 	commonRequirements = `
-Return new fuzzing target, that process all invalid func call results as error
-
-Requirements:
-+ return only fuzz target code
-+ without imports
-+ no explanation
-+ process all edge cases
-+ if arguments is invalid, target function shouldn't be call, this case should be skipped
-+ if there is an explicit exception creation, skip only them by their message, the rest should cause a fuzzing test error
-+ situations that should not occur during the execution of the function should end with t.Error
-+ use simple strings for t.Error or t.Log without any variables format
-+ don't use not exported fields in validation checks
-+ use UTF-8
+Requirements: 
+	+ return only fuzz target code 
+	+ you can past code only instead comments like "Put here your" 
+	+ no explanation 
+	+ process all edge cases 
+	+ if arguments is invalid, target function shouldn't be call, this case should be skipped 
+	+ if there is an explicit exception creation, skip only them by their message, the rest should cause a fuzzing test error 
+	+ situations that should not occur during the execution of the function should end with t.Error 
+	+ use simple strings for t.Error or t.Log without any variables format 
+	+ don't use not exported fields in validation checks (its starts with lowercase letter)
 	`
 
 	patternTargetUseFuzz string = `
@@ -35,7 +32,7 @@ Purpose: extend target func result check in fuzzing target
 
 %s
 
-Target func:
+Target func from package %s:
 
 %s
 
@@ -59,7 +56,7 @@ Purpose: extend target func result check in fuzzing target
 
 %s
 
-Target func:
+Target func from package %s:
 
 %s
 
@@ -77,7 +74,7 @@ You write fuzzing test using golang
 
 %s
 
-Purpose: generate fuzz target func for function:
+Purpose: generate fuzz target func for function from package %s:
 
 %s
 
@@ -92,12 +89,17 @@ func CreatePrompt(
 	qualifier *mod.ImportQualifier,
 ) string {
 	if len(fuzzTarget) == 0 {
-		return fillTemplate(patternTarget, getSourceCode(target.AstFuncDecl, fset))
+		return fillTemplate(
+			patternTarget,
+			target.PkgPath,
+			getSourceCode(target.AstFuncDecl, fset),
+		)
 	}
 
 	if len(target.Uses) > 0 {
 		return fillTemplate(
 			patternTargetUseFuzz,
+			target.PkgPath,
 			getSourceCode(target.AstFuncDecl, fset),
 			getSourceCode(target.Uses[0], fset),
 			fuzzTarget,
@@ -105,7 +107,13 @@ func CreatePrompt(
 		)
 	}
 
-	return fillTemplate(patternTargetFuzz, getSourceCode(target.AstFuncDecl, fset), fuzzTarget, getImports(qualifier))
+	return fillTemplate(
+		patternTargetFuzz,
+		target.PkgPath,
+		getSourceCode(target.AstFuncDecl, fset),
+		fuzzTarget,
+		getImports(qualifier),
+	)
 }
 
 func getSourceCode(target *ast.FuncDecl, fset *token.FileSet) string {
