@@ -233,7 +233,6 @@ func FzgenMain() int {
 			_, err := cmd.Output()
 			if err != nil {
 				fmt.Println(err.Error())
-				fail(err)
 			}
 		}
 
