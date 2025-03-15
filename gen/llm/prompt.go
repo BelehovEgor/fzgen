@@ -14,7 +14,7 @@ import (
 var (
 	commonRequirements = `
 Requirements: 
-	+ return only fuzz target code 
+	+ return only code 
 	+ you can past code only instead comments like "Put here your" 
 	+ no explanation 
 	+ process all edge cases 
