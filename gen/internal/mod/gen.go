@@ -61,7 +61,7 @@ func GenerateInitTestFunc(
 	typeContext *TypeContext,
 	qualifier *ImportQualifier,
 ) *GeneratedFunc {
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 
 	emit("var FabricFuncsForCustomTypes map[string][]reflect.Value\n\n")
 	emit("func TestMain(m *testing.M) {\n")
@@ -116,11 +116,15 @@ func GenerateInitTestFunc(
 	}
 }
 
-func createEmmiter() (*bytes.Buffer, func(format string, args ...interface{})) {
+func CreateEmmiter() (*bytes.Buffer, func(format string, args ...interface{})) {
 	buf := new(bytes.Buffer)
 	var w io.Writer = buf
 	emit := func(format string, args ...interface{}) {
-		fmt.Fprintf(w, format, args...)
+		if len(args) == 0 {
+			fmt.Fprint(w, format)
+		} else {
+			fmt.Fprintf(w, format, args...)
+		}
 	}
 
 	return buf, emit
@@ -233,7 +237,7 @@ func createFabricOfEmptyInterface(
 	funcs := make([]*GeneratedFunc, len(structs)+1)
 
 	for i, impl := range structs {
-		buf, emit := createEmmiter()
+		buf, emit := CreateEmmiter()
 		typeName := varContext.CreateUniqueName(impl.StructName)
 		funcName := fmt.Sprintf("fabric_interface_empty_%s", typeName)
 		typeString := impl.TypeString(qualifier.Qualifier)
@@ -248,7 +252,7 @@ func createFabricOfEmptyInterface(
 		}
 	}
 
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 	funcName := "fabric_interface_empty_string"
 	emit("func %s(impl string) interface{} {\n", funcName)
 	emit("\treturn impl\n")
@@ -295,7 +299,7 @@ func createFabricOfInterfaces2(
 	funcs := make([]*GeneratedFunc, len(pkgInterface.Implementations))
 
 	for i, impl := range pkgInterface.Implementations {
-		buf, emit := createEmmiter()
+		buf, emit := CreateEmmiter()
 		funcSuffix := varContext.CreateUniqueName(impl.StructName)
 		funcName := fmt.Sprintf("fabric_interface_%s_%s_%s", pkgInterface.PkgName, pkgInterface.InterfaceName, funcSuffix)
 		emit("func %s(impl ", funcName)
@@ -333,7 +337,7 @@ func createFabricOfFuncs(
 		return suitable[i].FuncName > suitable[j].FuncName
 	})
 
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 
 	Index++
 	funcName := fmt.Sprintf("fabric_func_%d", Index)

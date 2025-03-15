@@ -1,16 +1,16 @@
 package gen
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"go/token"
 	"go/types"
-	"io"
 	"os"
 	"sort"
 
 	"github.com/BelehovEgor/fzgen/fuzzer"
 	"github.com/BelehovEgor/fzgen/gen/internal/mod"
+	"github.com/BelehovEgor/fzgen/gen/llm"
 )
 
 type wrapperOptions struct {
@@ -18,6 +18,7 @@ type wrapperOptions struct {
 	topComment             string // additional comment for top of generated file.
 	parallel               bool
 	requiredMocks          bool
+	llmClient              string
 	mocksPackagePrefix     string // helps mocks define mock imports
 	maxMockDepth           int
 	constructorFillingMode fuzzer.ConstructorFillingMode
@@ -50,11 +51,7 @@ func emitIndependentWrappers(
 	}
 
 	// prepare the output
-	buf := new(bytes.Buffer)
-	var w io.Writer = buf
-	emit := func(format string, args ...interface{}) {
-		fmt.Fprintf(w, format, args...)
-	}
+	buf, emit := mod.CreateEmmiter()
 
 	// put our functions we want to wrap into a deterministic order
 	sort.Slice(pkgFuncs.Targets, func(i, j int) bool {
@@ -94,12 +91,13 @@ func emitIndependentWrappers(
 	var firstErr error
 	var success bool
 	for _, function := range pkgFuncs.Targets {
-		err := emitIndependentWrapper(emit, function, typeContext, qualifier, options)
+		result, err := emitIndependentWrapper(function, typeContext, qualifier, pkgFuncs.Fset, options)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
 		if err == nil {
 			success = true
+			emit(result)
 		}
 	}
 	if !success {
@@ -152,16 +150,18 @@ var wrapperIndex int = 0
 // constructor is suitable for creating the receiver of a wrapped method.
 // qualifyAll indicates if all variables should be qualified with their package.
 func emitIndependentWrapper(
-	emit emitFunc,
 	function *mod.Func,
 	typeContext *mod.TypeContext,
 	qualifier *mod.ImportQualifier,
+	fset *token.FileSet,
 	options wrapperOptions,
-) error {
+) (string, error) {
+	buf, emit := mod.CreateEmmiter()
+
 	f := function.TypesFunc
 	wrappedSig, ok := f.Type().(*types.Signature)
 	if !ok {
-		return fmt.Errorf("function %s is not *types.Signature (%+v)", function, f)
+		return buf.String(), fmt.Errorf("function %s is not *types.Signature (%+v)", function, f)
 	}
 
 	// Get our receiver, which might be nil if we don't have a receiver
@@ -177,7 +177,7 @@ func emitIndependentWrapper(
 		if err != nil {
 			// output to stderr, but don't treat as fatal error.
 			fmt.Fprintf(os.Stderr, "genfuzzfuncs: warning: createWrapper: failed to determine receiver type: %v: %v\n", recv, err)
-			return nil
+			return buf.String(), nil
 		}
 		recvNamedTypeLocalName := n.Obj().Name()
 		wrapperName = fmt.Sprintf("Fuzz_N%d_%s_%s", wrapperIndex, recvNamedTypeLocalName, f.Name())
@@ -192,7 +192,7 @@ func emitIndependentWrapper(
 	}
 	if len(inputParams) == 0 && recv == nil {
 		// skip this wrapper, not useful for fuzzing if no inputs (no receiver, no parameters).
-		return fmt.Errorf("%w: %s has 0 input params", errNoFunctionsMatch, function.FuncName)
+		return buf.String(), fmt.Errorf("%w: %s has 0 input params", errNoFunctionsMatch, function.FuncName)
 	}
 
 	paramReprs := make([]*paramRepr, 0, len(inputParams)+1)
@@ -221,7 +221,7 @@ func emitIndependentWrapper(
 	if !isSupported {
 		unsupportedParamType := unsupportedParam.Type().String()
 		emit("// skipping %s because parameters include unsupported type: %v\n\n", wrapperName, unsupportedParamType)
-		return fmt.Errorf("%w: %s takes %s", errUnsupportedParams, function.FuncName, unsupportedParamType)
+		return buf.String(), fmt.Errorf("%w: %s takes %s", errUnsupportedParams, function.FuncName, unsupportedParamType)
 	}
 
 	// Start emitting func
@@ -257,7 +257,7 @@ func emitIndependentWrapper(
 
 	emitFillResultCheck(emit, fillErrVarName, paramReprs)
 
-	emit("\n")
+	emit("\n// Put here your precondition of func arguments...\n\n")
 
 	args := paramReprs
 	if recvParam != nil {
@@ -265,10 +265,26 @@ func emitIndependentWrapper(
 	}
 
 	emitWrappedFunc(emit, function, recvParam, args, qualifier.Qualifier)
+
+	emit("\n// Put here your postcondition of func results...\n")
+
 	emit("\t})\n")
 	emit("}\n\n")
 
-	return nil
+	algoritmicCode := buf.String()
+	if options.llmClient == "" || function.AstFuncDecl == nil {
+		return algoritmicCode, nil
+	}
+
+	llmClient := llm.GetClient(options.llmClient)
+	result, err := llmClient.Call(llm.CreatePrompt(fset, function, algoritmicCode, qualifier))
+	if err != nil || result == "" {
+		fmt.Fprintf(os.Stderr, "genfuzzfuncs: warning: error while calling LLM: %v\n", err)
+
+		return algoritmicCode, nil
+	}
+
+	return result, nil
 }
 
 func emitFillResultCheck(emit emitFunc, fillErrorName string, allParams []*paramRepr) {

@@ -79,7 +79,7 @@ func generateMockeryYaml(mocks []types.Type) []byte {
 	}
 
 	// mockery doesn't want work with \t
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 	emit("with-expecter: True\n")
 	emit("packages:\n")
 
@@ -255,7 +255,7 @@ func createInterfaceMock(
 		}
 	}
 
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 
 	varContext := NewVariablesContext(qualifier)
 	var names []string
@@ -373,7 +373,7 @@ func createFuncMock(
 		typeContext.AddType(signatureThatNeededMock)
 	}
 
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 
 	varContext := NewVariablesContext(qualifier)
 	var names []string
@@ -425,7 +425,7 @@ func createEmptyInterfaceMock(
 	importPrefix string,
 	qualifier *ImportQualifier,
 ) *GeneratedFunc {
-	buf, emit := createEmmiter()
+	buf, emit := CreateEmmiter()
 
 	interfaceName := named.Obj().Name()
 	returnType := types.TypeString(named, qualifier.Qualifier)

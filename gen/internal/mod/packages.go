@@ -1,5 +1,7 @@
 package mod
 
+import "go/token"
+
 type Package struct {
 	PkgName    string
 	PkgPath    string
@@ -7,4 +9,6 @@ type Package struct {
 	Funcs      []*Func
 	Structs    []*Struct
 	Interfaces []*Interface
+
+	Fset *token.FileSet
 }

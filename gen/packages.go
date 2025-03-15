@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"os"
 	"os/exec"
@@ -196,13 +197,18 @@ func getPackageContent(
 				hasGenerics = true
 				continue
 			}
-
 			f := mod.Func{
 				FuncName:  id.Name,
 				PkgName:   pkg.Name,
 				PkgPath:   pkg.PkgPath,
 				PkgDir:    pkgDir,
 				TypesFunc: objType,
+			}
+
+			if id.Obj != nil && id.Obj.Decl != nil {
+				if funcDecl, ok := id.Obj.Decl.(*ast.FuncDecl); ok {
+					f.AstFuncDecl = funcDecl
+				}
 			}
 
 			funcs = append(funcs, &f)
@@ -216,6 +222,9 @@ func getPackageContent(
 		fmt.Println("Warning! Generics not supported")
 	}
 
+	// TODO: do it only if llm requested
+	findUsages(pkg, targets)
+
 	return &mod.Package{
 		PkgName:    pkg.Name,
 		PkgPath:    pkg.PkgPath,
@@ -223,6 +232,8 @@ func getPackageContent(
 		Funcs:      funcs,
 		Structs:    structs,
 		Interfaces: interfaces,
+
+		Fset: pkg.Fset,
 	}, nil
 }
 
@@ -404,4 +415,45 @@ func isInterfaceRecv(f *types.Func) bool {
 
 	_, ok = recv.Type().Underlying().(*types.Signature)
 	return ok
+}
+
+func findUsages(pkg *packages.Package, targets []*mod.Func) {
+	targetsMap := make(map[string]*mod.Func)
+	for _, tar := range targets {
+		targetsMap[tar.FuncName] = tar
+	}
+
+	for _, syntax := range pkg.Syntax {
+		ast.Inspect(syntax, func(n ast.Node) bool {
+			// Check if the node is a function declaration
+			fn, ok := n.(*ast.FuncDecl)
+			if !ok {
+				return true
+			}
+
+			// Traverse the function body to find calls to the target function
+			ast.Inspect(fn, func(n ast.Node) bool {
+				// Check if the node is a function call
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+
+				ident, ok := call.Fun.(*ast.Ident)
+				if !ok {
+					return true
+				}
+
+				// Check if the function being called is the target function
+				if target, has := targetsMap[ident.Name]; has {
+					target.Uses = append(target.Uses, fn)
+					return false
+				}
+
+				return true
+			})
+
+			return false
+		})
+	}
 }

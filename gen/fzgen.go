@@ -35,6 +35,7 @@ Usage:
 	fzgen [-chain] [-parallel] 
 		[-ctor=<target-constructor-regexp>] [-unexported] 
 		[-mocks] [-mocksPackagePrefix] [-package] [-mocksDepth] [-structFillMode]
+		[-llm=<name-of-client>]
 	
 Running fzgen without any arguments targets the package in the current directory.
 
@@ -86,6 +87,9 @@ func FzgenMain() int {
 	// Struct filling
 	var constructorFillingMode string
 	flag.StringVar(&constructorFillingMode, "structFillMode", string(fuzzer.Constructors), "Constructor filling mode (Constructors, Random, ConstructorsAndRandom)")
+
+	// LLM
+	llmClient := flag.String("llm", "", "trying use llm to upgrade generating result")
 
 	flag.Parse()
 
@@ -200,6 +204,7 @@ func FzgenMain() int {
 			mocksPackagePrefix:     *mocksPackagePrefix,
 			maxMockDepth:           *maxDepth,
 			constructorFillingMode: fuzzer.ConstructorFillingMode(constructorFillingMode),
+			llmClient:              *llmClient,
 		}
 
 		// Do the actual work of emitting our wrappers.
@@ -228,7 +233,6 @@ func FzgenMain() int {
 			_, err := cmd.Output()
 			if err != nil {
 				fmt.Println(err.Error())
-				fail(err)
 			}
 		}
 
