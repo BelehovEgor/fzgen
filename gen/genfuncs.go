@@ -257,7 +257,7 @@ func emitIndependentWrapper(
 
 	emitFillResultCheck(emit, fillErrVarName, paramReprs)
 
-	emit("\n")
+	emit("\n// Put here your precondition of func arguments...\n\n")
 
 	args := paramReprs
 	if recvParam != nil {
@@ -265,6 +265,9 @@ func emitIndependentWrapper(
 	}
 
 	emitWrappedFunc(emit, function, recvParam, args, qualifier.Qualifier)
+
+	emit("\n// Put here your postcondition of func results...\n")
+
 	emit("\t})\n")
 	emit("}\n\n")
 
