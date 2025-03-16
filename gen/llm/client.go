@@ -33,8 +33,10 @@ func GetClient(clientName string) Client {
 		return &OpenRouterClient{}
 	case "gigachat":
 		return &GigachatClient{}
-	case "groq":
+	case "groq-qwen":
 		return &GroqClient{}
+	case "groq-deepseek":
+		return &GroqDeepSeekClient{}
 	case "mock":
 		return &MockClient{}
 	default:
