@@ -105,11 +105,17 @@ func NewFuzzerV2(
 		reusableInputs: make(map[reflect.Type][]*reflect.Value),
 		outputSlots:    make(map[reflect.Type][]*outputSlot),
 	}
-	return &Fuzzer{
+	fuzzer := &Fuzzer{
 		data:            data,
 		randparamFuzzer: fill,
 		execState:       state,
 	}
+
+	for _, opt := range options {
+		opt(fuzzer)
+	}
+
+	return fuzzer
 }
 
 // Fill fills in most simple types, maps, slices, arrays, and recursively fills any public members of x.
@@ -262,6 +268,11 @@ type chainOpts struct {
 // and then later run with the race detector enabled.
 func ChainParallel(fz *Fuzzer) error {
 	fz.chainOpts.parallel = true
+	return nil
+}
+
+func FillUnexported(fz *Fuzzer) error {
+	fz.randparamFuzzer.FillUnexported = true
 	return nil
 }
 

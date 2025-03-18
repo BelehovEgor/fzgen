@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 type StructFillingMode int
@@ -43,6 +44,7 @@ type Fuzzer struct {
 	// tech
 	used              map[reflect.Value]bool
 	structFillingMode StructFillingMode
+	FillUnexported    bool
 }
 
 // NewFuzzer returns a *Fuzzer, initialized with the []byte as an input stream for drawing values via rand.Rand.
@@ -295,13 +297,29 @@ func (f *Fuzzer) fillUsingFabric(reflectValue reflect.Value, depth int, opts fil
 	return nil
 }
 
-func (f *Fuzzer) fillFields(reflectValue reflect.Value, depth int, opts fillOpts) {
+func (f *Fuzzer) fillFields(reflectValue reflect.Value, depth int, opts fillOpts) error {
 	for i := 0; i < reflectValue.NumField(); i++ {
-		if reflectValue.Field(i).CanSet() {
-			// TODO: could consider option for unexported fields
-			f.fill(reflectValue.Field(i), depth, opts)
+		var v reflect.Value
+		if !reflectValue.Field(i).CanSet() {
+			if !f.FillUnexported {
+				continue
+			}
+
+			v = reflect.NewAt(reflectValue.Field(i).Type(), unsafe.Pointer(reflectValue.Field(i).UnsafeAddr())).Elem()
+
+			if err := f.fill(v, depth, opts); err != nil {
+				return err
+			}
+		} else {
+			if reflectValue.Field(i).CanSet() {
+				if err := f.fill(reflectValue.Field(i), depth, opts); err != nil {
+					return err
+				}
+			}
 		}
 	}
+
+	return nil
 }
 
 func (f *Fuzzer) fillFunc(reflectValue reflect.Value, depth int, opts fillOpts) bool {

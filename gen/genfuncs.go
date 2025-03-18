@@ -22,6 +22,7 @@ type wrapperOptions struct {
 	mocksPackagePrefix     string // helps mocks define mock imports
 	maxMockDepth           int
 	constructorFillingMode fuzzer.ConstructorFillingMode
+	fillUnexported         bool
 }
 
 type emitFunc func(format string, args ...interface{})
@@ -242,10 +243,16 @@ func emitIndependentWrapper(
 	case fuzzer.Random:
 		mode = "fuzzer.Random"
 	}
+
 	emit(
-		"\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t, %s)\n",
+		"\t\tfz := fuzzer.NewFuzzerV2(data, FabricFuncsForCustomTypes, t, %s",
 		mode,
 	)
+	if options.fillUnexported {
+		emit(", fuzzer.FillUnexported")
+	}
+	emit(")\n")
+
 	emit("\t\t%s := fz.Fill2(", fillErrVarName)
 	for i, p := range paramReprs {
 		if i > 0 {
