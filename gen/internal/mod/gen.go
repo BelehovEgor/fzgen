@@ -46,6 +46,14 @@ func GenerateFabrics(
 		}
 	}
 
+	for c := range typeContext.ValidConstructors {
+		wrapper := createConstructorWrapper(c, qualifier)
+
+		wrappers := make(map[string]*GeneratedFunc)
+		wrappers[wrapper.Name] = wrapper
+		generated[wrapper.ReturnType] = wrappers
+	}
+
 	result := make(map[string][]*GeneratedFunc)
 	for typeName, fabrics := range generated {
 		for _, fabric := range fabrics {
@@ -81,30 +89,6 @@ func GenerateInitTestFunc(
 				f.Name,
 			)
 		}
-	}
-
-	var orderedConstructors []*Constructor
-	for c := range typeContext.ValidConstructors {
-		orderedConstructors = append(orderedConstructors, c)
-	}
-
-	sort.Slice(orderedConstructors, func(i, j int) bool {
-		return orderedConstructors[i].Func.FuncName > orderedConstructors[j].Func.FuncName
-	})
-
-	for _, constructor := range orderedConstructors {
-		if !constructor.Func.TypesFunc.Exported() && !qualifier.isLocalTest {
-			continue
-		}
-
-		returnType := types.TypeString(constructor.ReturnType, qualifier.Qualifier)
-
-		emit(
-			"\tFabricFuncsForCustomTypes[\"%s\"] = append(FabricFuncsForCustomTypes[\"%s\"], reflect.ValueOf(%s))\n",
-			returnType,
-			returnType,
-			constructor.Func.TypeString(qualifier.Qualifier),
-		)
 	}
 
 	emit("\tm.Run()\n")
@@ -369,6 +353,65 @@ func createFabricOfFuncs(
 	}
 
 	return result
+}
+
+func createConstructorWrapper(
+	constructor *Constructor,
+	qualifier *ImportQualifier,
+) *GeneratedFunc {
+	if !constructor.Func.TypesFunc.Exported() && !qualifier.isLocalTest {
+		return nil
+	}
+
+	funcName := fmt.Sprintf("fabric_constructor_wrapper_%s_%d", constructor.Func.FuncName, Index)
+	returnType := types.TypeString(constructor.ReturnType, qualifier.Qualifier)
+
+	buf, emit := CreateEmmiter()
+	emit("func %s(\n", funcName)
+
+	for _, returnValue := range constructor.Func.Params() {
+		emit("\t%s %s,\n", returnValue.Name(), types.TypeString(returnValue.Type(), qualifier.Qualifier))
+	}
+	emit(") (result %s, err error) {\n", returnType)
+
+	emit("\tdefer func() {\n")
+	emit("\t\tif r := recover(); r != nil {\n")
+	emit("\t\t\terr = fmt.Errorf(\"runtime panic: %s\", r)\n", "%v")
+	emit("\t\t}\n")
+	emit("\t}()\n\n")
+
+	results := constructor.Func.GetSignature().Results()
+	if results.Len() == 1 {
+		emit("\tres := ")
+	} else {
+		emit("\tres, err := ")
+	}
+
+	emit("%s(\n", constructor.Func.TypeString(qualifier.Qualifier))
+	for i, returnValue := range constructor.Func.Params() {
+		if i == len(constructor.Func.Params())-1 && constructor.Func.GetSignature().Variadic() {
+			emit("\t\t%s...,\n", returnValue.Name())
+		} else {
+			emit("\t\t%s,\n", returnValue.Name())
+		}
+	}
+	emit("\t)\n")
+
+	targetObject := results.At(0)
+	if _, ok := targetObject.Type().(*types.Pointer); ok {
+		emit("return *res, err\n")
+	} else {
+		emit("return res, err\n")
+	}
+
+	emit("}\n")
+
+	return &GeneratedFunc{
+		Name:       funcName,
+		Body:       buf.String(),
+		ReturnType: returnType,
+		Type:       constructor.ReturnType,
+	}
 }
 
 func signatureToStringWithoutNames(
