@@ -369,10 +369,19 @@ func createConstructorWrapper(
 	buf, emit := CreateEmmiter()
 	emit("func %s(\n", funcName)
 
+	resName := "res"
+	errName := "err"
+	var argNames []string
+	varNamesContext := NewVariablesContext(qualifier)
+
 	for _, returnValue := range constructor.Func.Params() {
-		emit("\t%s %s,\n", returnValue.Name(), types.TypeString(returnValue.Type(), qualifier.Qualifier))
+		argName := varNamesContext.CreateUniqueName(returnValue.Name())
+		emit("\t%s %s,\n", argName, types.TypeString(returnValue.Type(), qualifier.Qualifier))
+		argNames = append(argNames, argName)
 	}
-	emit(") (result %s, err error) {\n", returnType)
+
+	errName = varNamesContext.CreateUniqueName(errName)
+	emit(") (result_ %s, %s error) {\n", returnType, errName)
 
 	emit("\tdefer func() {\n")
 	emit("\t\tif r := recover(); r != nil {\n")
@@ -382,26 +391,26 @@ func createConstructorWrapper(
 
 	results := constructor.Func.GetSignature().Results()
 	if results.Len() == 1 {
-		emit("\tres := ")
+		emit("\t%s := ", resName)
 	} else {
-		emit("\tres, err := ")
+		emit("\t%s, %s := ", resName, errName)
 	}
 
 	emit("%s(\n", constructor.Func.TypeString(qualifier.Qualifier))
-	for i, returnValue := range constructor.Func.Params() {
+	for i, argName := range argNames {
 		if i == len(constructor.Func.Params())-1 && constructor.Func.GetSignature().Variadic() {
-			emit("\t\t%s...,\n", returnValue.Name())
+			emit("\t\t%s...,\n", argName)
 		} else {
-			emit("\t\t%s,\n", returnValue.Name())
+			emit("\t\t%s,\n", argName)
 		}
 	}
 	emit("\t)\n")
 
 	targetObject := results.At(0)
 	if _, ok := targetObject.Type().(*types.Pointer); ok {
-		emit("return *res, err\n")
+		emit("return *%s, %s\n", resName, errName)
 	} else {
-		emit("return res, err\n")
+		emit("return %s, %s\n", resName, errName)
 	}
 
 	emit("}\n")
